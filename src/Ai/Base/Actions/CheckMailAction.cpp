@@ -13,6 +13,9 @@
 
 bool CheckMailAction::Execute(Event /*event*/)
 {
+    if (sPlayerbotAIConfig.randomBotEmote && !urand(0, 1))
+        bot->HandleEmoteCommand(EMOTE_ONESHOT_USE_STANDING);
+
     WorldPacket p;
     bot->GetSession()->HandleQueryNextMailTime(p);
 

@@ -46,6 +46,14 @@ bool ReleaseSpiritAction::Execute(Event event)
         : PlayerbotTextMgr::instance().GetBotTextOrDefault("release_spirit_meet_graveyard", "Meet me at the graveyard", {});
     botAI->TellMasterNoFacing(message);
 
+    if (bot->GetGroup() && !urand(0, 1))
+    {
+        std::map<std::string, std::string> placeholders;
+        std::string text = PlayerbotTextMgr::instance().GetBotText("broadcast_dungeon_wipe", placeholders);
+        if (!text.empty())
+            botAI->SayToParty(text);
+    }
+
     IncrementDeathCount();
     bot->DurabilityRepairAll(false, 1.0f, false);
     LogRelease("released");

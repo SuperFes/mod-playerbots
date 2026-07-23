@@ -84,6 +84,7 @@ public:
         PLAYERHOOK_ON_AFTER_UPDATE,
         PLAYERHOOK_ON_BEFORE_CRITERIA_PROGRESS,
         PLAYERHOOK_ON_BEFORE_ACHI_COMPLETE,
+        PLAYERHOOK_ON_ACHI_COMPLETE,
         PLAYERHOOK_CAN_PLAYER_USE_PRIVATE_CHAT,
         PLAYERHOOK_CAN_PLAYER_USE_GROUP_CHAT,
         PLAYERHOOK_CAN_PLAYER_USE_GUILD_CHAT,
@@ -273,6 +274,57 @@ public:
         }
 
         return true;
+    }
+
+    void OnAchievementComplete(Player* player, AchievementEntry const* /*achievement*/)
+    {
+        if (!player)
+            return;
+
+        // Party Reaction
+        if (Group* group = player->GetGroup())
+        {
+            for (GroupReference* gref = group->GetFirstMember(); gref; gref = gref->next())
+            {
+                Player* member = gref->GetSource();
+                if (!member || member == player)
+                    continue;
+
+                if (GET_PLAYERBOT_AI(member))
+                {
+                    if (sPlayerbotAIConfig.randomBotEmote && !urand(0, 1))
+                    {
+                        member->SetFacingToObject(player);
+                        member->HandleEmoteCommand(urand(0, 1) ? EMOTE_ONESHOT_CHEER : EMOTE_ONESHOT_APPLAUD);
+                    }
+                }
+            }
+        }
+
+        // Guild Reaction
+        if (player->GetGuildId() && !urand(0, 1))
+        {
+            PlayerbotMgr* playerbotMgr = PlayerbotsMgr::instance().GetPlayerbotMgr(player);
+            if (playerbotMgr != nullptr)
+            {
+                for (PlayerBotMap::const_iterator it = playerbotMgr->GetPlayerBotsBegin(); it != playerbotMgr->GetPlayerBotsEnd(); ++it)
+                {
+                    Player* const bot = it->second;
+                    if (bot == nullptr || bot == player || bot->GetGuildId() != player->GetGuildId())
+                        continue;
+
+                    if (PlayerbotAI* botAI = PlayerbotsMgr::instance().GetPlayerbotAI(bot))
+                    {
+                        std::map<std::string, std::string> placeholders;
+                        placeholders["%other_name"] = player->GetName();
+                        std::string text = PlayerbotTextMgr::instance().GetBotText("broadcast_achievement_complete", placeholders);
+                        if (!text.empty())
+                            botAI->SayToGuild(text);
+                        break;
+                    }
+                }
+            }
+        }
     }
 
     void OnPlayerGiveXP(Player* player, uint32& amount, Unit* /*victim*/, uint8 /*xpSource*/) override
