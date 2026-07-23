@@ -180,6 +180,22 @@ bool BroadcastHelper::BroadcastLootingItem(PlayerbotAI* ai, Player* bot, ItemTem
     placeholders["%my_race"] = ai->GetChatHelper()->FormatRace(bot->getRace());
     placeholders["%my_level"] = std::to_string(bot->GetLevel());
 
+    if (proto->Quality >= ITEM_QUALITY_RARE && bot->GetGroup())
+    {
+        for (GroupReference* gref = bot->GetGroup()->GetFirstMember(); gref; gref = gref->next())
+        {
+            Player* member = gref->GetSource();
+            if (member && member != bot && GET_PLAYERBOT_AI(member))
+            {
+                if (sPlayerbotAIConfig.randomBotEmote && !urand(0, 1))
+                {
+                    member->SetFacingToObject(bot);
+                    member->HandleEmoteCommand(EMOTE_ONESHOT_APPLAUD);
+                }
+            }
+        }
+    }
+
     switch (proto->Quality)
     {
         case ITEM_QUALITY_POOR:
@@ -479,6 +495,11 @@ bool BroadcastHelper::BroadcastKill(PlayerbotAI* ai, Player* bot, Creature *crea
     }
     else if (creature->IsPlayer())
     {
+        if (sPlayerbotAIConfig.randomBotEmote && !urand(0, 1))
+        {
+            ai->GetBot()->HandleEmoteCommand(urand(0, 1) ? EMOTE_ONESHOT_ROAR : EMOTE_ONESHOT_LAUGH);
+        }
+
         if (urand(1, sPlayerbotAIConfig.broadcastChanceMaxValue) <= sPlayerbotAIConfig.broadcastChanceKillPlayer)
         {
             placeholders["%victim_class"] = ai->GetChatHelper()->FormatClass(creature->getClass());
@@ -564,6 +585,25 @@ bool BroadcastHelper::BroadcastKill(PlayerbotAI* ai, Player* bot, Creature *crea
 
 bool BroadcastHelper::BroadcastLevelup(PlayerbotAI* ai, Player* bot)
 {
+    if (Group* group = bot->GetGroup())
+    {
+        for (GroupReference* gref = group->GetFirstMember(); gref; gref = gref->next())
+        {
+            Player* member = gref->GetSource();
+            if (!member || member == bot)
+                continue;
+
+            if (GET_PLAYERBOT_AI(member))
+            {
+                if (sPlayerbotAIConfig.randomBotEmote && !urand(0, 1))
+                {
+                    member->SetFacingToObject(bot);
+                    member->HandleEmoteCommand(urand(0, 1) ? EMOTE_ONESHOT_CHEER : EMOTE_ONESHOT_APPLAUD);
+                }
+            }
+        }
+    }
+
     if (!sPlayerbotAIConfig.enableBroadcasts)
         return false;
     uint32 level = bot->GetLevel();

@@ -26,8 +26,10 @@ bool GreetAction::Execute(Event /*event*/)
 
     ObjectGuid oldSel = bot->GetTarget();
     bot->SetTarget(guid);
-    // bot->HandleEmote(EMOTE_ONESHOT_WAVE);
-    botAI->PlayEmote(TEXT_EMOTE_HELLO);
+    if (player->IsMounted() && sPlayerbotAIConfig.randomBotEmote && !urand(0, 1))
+        bot->HandleEmoteCommand(EMOTE_ONESHOT_APPLAUD);
+    else
+        botAI->PlayEmote(TEXT_EMOTE_HELLO);
     bot->SetTarget(oldSel);
 
     GuidSet& alreadySeenPlayers = botAI->GetAiObjectContext()->GetValue<GuidSet&>("already seen players")->Get();

@@ -12,7 +12,7 @@ void EmoteStrategy::InitTriggers(std::vector<TriggerNode*>& triggers)
 {
     if (sPlayerbotAIConfig.randomBotEmote)
     {
-        triggers.push_back(new TriggerNode("often", { NextAction("talk", 1.0f) }));
+        triggers.push_back(new TriggerNode("seldom", { NextAction("talk", 1.0f) }));
         triggers.push_back(new TriggerNode("seldom", { NextAction("emote", 1.0f) }));
         triggers.push_back(
             new TriggerNode("receive text emote", { NextAction("emote", 10.0f) }));
@@ -23,7 +23,7 @@ void EmoteStrategy::InitTriggers(std::vector<TriggerNode*>& triggers)
     if (sPlayerbotAIConfig.randomBotTalk)
     {
         triggers.push_back(new TriggerNode(
-            "often",
+            "seldom",
             { NextAction("suggest what to do", 10.0f), NextAction("suggest dungeon", 3.0f),
                               NextAction("suggest trade", 3.0f) }));
     }
@@ -32,5 +32,5 @@ void EmoteStrategy::InitTriggers(std::vector<TriggerNode*>& triggers)
         triggers.push_back(
             new TriggerNode("new player nearby", { NextAction("greet", 1.0f) }));
 
-    triggers.push_back(new TriggerNode("often", { NextAction("rpg mount anim", 1.0f) }));
+    triggers.push_back(new TriggerNode("seldom", { NextAction("rpg mount anim", 1.0f) }));
 }

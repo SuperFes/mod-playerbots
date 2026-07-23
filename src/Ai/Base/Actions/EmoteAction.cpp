@@ -734,10 +734,10 @@ bool EmoteAction::Execute(Event event)
     std::string param = event.getParam();
     if ((!isReact && param.empty()) || emote)
     {
-        // time_t lastEmote = AI_VALUE2(time_t, "last emote", qualifier); //not used, line marked for removal.
+        uint32 guidJitter = (bot->GetGUID().GetCounter() % 120);
         botAI->GetAiObjectContext()
             ->GetValue<time_t>("last emote", qualifier)
-            ->Set(time(nullptr) + urand(1000, sPlayerbotAIConfig.repeatDelay) / 1000);
+            ->Set(time(nullptr) + urand(60, 240) + guidJitter);
         param = qualifier;
     }
 
@@ -787,6 +787,15 @@ bool EmoteAction::isUseful()
     return time(nullptr) >= lastEmote;
 }
 
+bool TalkAction::isUseful()
+{
+    if (!botAI->AllowActivity())
+        return false;
+
+    time_t lastEmote = AI_VALUE2(time_t, "last emote", "talk");
+    return time(nullptr) >= lastEmote;
+}
+
 bool TalkAction::Execute(Event /*event*/)
 {
     Unit* target = botAI->GetUnit(AI_VALUE(ObjectGuid, "talk target"));
@@ -807,7 +816,12 @@ bool TalkAction::Execute(Event /*event*/)
                 playerBotAI->GetAiObjectContext()->GetValue<ObjectGuid>("talk target")->Set(bot->GetGUID());
 
         context->GetValue<ObjectGuid>("talk target")->Set(target->GetGUID());
-        return Emote(target, GetRandomEmote(target, true), true);
+
+        uint32 guidJitter = (bot->GetGUID().GetCounter() % 120);
+        botAI->GetAiObjectContext()->GetValue<time_t>("last emote", "talk")->Set(time(nullptr) + urand(60, 240) + guidJitter);
+
+        bool textEmote = (urand(0, 9) == 0);
+        return Emote(target, GetRandomEmote(target, textEmote), textEmote);
     }
 
     return false;
@@ -829,6 +843,7 @@ uint32 TalkAction::GetRandomEmote(Unit* unit, bool textEmote)
             types.push_back(TEXT_EMOTE_CHEER);
             types.push_back(TEXT_EMOTE_SHY);
             types.push_back(TEXT_EMOTE_JOKE);
+            types.push_back(TEXT_EMOTE_FLIRT);
         }
         else
         {

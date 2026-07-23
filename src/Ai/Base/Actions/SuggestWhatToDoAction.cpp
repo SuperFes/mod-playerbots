@@ -54,7 +54,7 @@ bool SuggestWhatToDoAction::isUseful()
 
     std::string qualifier = "suggest what to do";
     time_t lastSaid = AI_VALUE2(time_t, "last said", qualifier);
-    return (time(0) - lastSaid) > 30;
+    return time(nullptr) >= lastSaid;
 }
 
 bool SuggestWhatToDoAction::Execute(Event /*event*/)
@@ -64,7 +64,8 @@ bool SuggestWhatToDoAction::Execute(Event /*event*/)
     fnct_ptr();
 
     std::string const qualifier = "suggest what to do";
-    botAI->GetAiObjectContext()->GetValue<time_t>("last said", qualifier)->Set(time(nullptr) + urand(1, 60));
+    uint32 guidJitter = (bot->GetGUID().GetCounter() % 300);
+    botAI->GetAiObjectContext()->GetValue<time_t>("last said", qualifier)->Set(time(nullptr) + urand(300, 600) + guidJitter);
 
     return true;
 }
@@ -256,6 +257,10 @@ bool SuggestDungeonAction::Execute(Event /*event*/)
 {
     // TODO: use PlayerbotDungeonRepository::instance()
 
+    std::string const qualifier = "suggest what to do";
+    uint32 guidJitter = (bot->GetGUID().GetCounter() % 300);
+    botAI->GetAiObjectContext()->GetValue<time_t>("last said", qualifier)->Set(time(nullptr) + urand(300, 600) + guidJitter);
+
     if (!sPlayerbotAIConfig.randomBotSuggestDungeons || bot->GetGroup())
         return false;
 
@@ -321,6 +326,10 @@ SuggestTradeAction::SuggestTradeAction(PlayerbotAI* botAI) : SuggestWhatToDoActi
 
 bool SuggestTradeAction::Execute(Event /*event*/)
 {
+    std::string const qualifier = "suggest what to do";
+    uint32 guidJitter = (bot->GetGUID().GetCounter() % 300);
+    botAI->GetAiObjectContext()->GetValue<time_t>("last said", qualifier)->Set(time(nullptr) + urand(300, 600) + guidJitter);
+
     uint32 quality = urand(0, 100);
     if (quality > 95)
         quality = ITEM_QUALITY_LEGENDARY;

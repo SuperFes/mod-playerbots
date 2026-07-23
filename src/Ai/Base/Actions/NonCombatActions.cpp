@@ -70,6 +70,10 @@ bool DrinkAction::Execute(Event event)
         // return botAI->CastSpell(24707, bot);
     }
 
+    if (bot->isMoving())
+        bot->StopMoving();
+    bot->SetStandState(UNIT_STAND_STATE_SIT);
+
     return UseItemAction::Execute(event);
 }
 
@@ -128,6 +132,10 @@ bool EatAction::Execute(Event event)
         bot->AddAura(25990, bot);
         return true;
     }
+
+    if (bot->isMoving())
+        bot->StopMoving();
+    bot->SetStandState(UNIT_STAND_STATE_SIT);
 
     return UseItemAction::Execute(event);
 }

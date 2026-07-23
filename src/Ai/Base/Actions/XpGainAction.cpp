@@ -35,9 +35,25 @@ bool XpGainAction::Execute(Event event)
     // }
 
     Creature* creature = botAI->GetCreature(guid);
-    if (creature && !creature->GetMap()->IsDungeon())
+    if (creature)
     {
-        BroadcastHelper::BroadcastKill(botAI, bot, creature);
+        if (!creature->GetMap()->IsDungeon())
+            BroadcastHelper::BroadcastKill(botAI, bot, creature);
+
+        if (sPlayerbotAIConfig.randomBotEmote)
+        {
+            if (creature->IsDungeonBoss() || creature->isWorldBoss())
+            {
+                if (!urand(0, 3))
+                    bot->HandleEmoteCommand(EMOTE_STATE_DANCE);
+                else
+                    bot->HandleEmoteCommand(EMOTE_ONESHOT_CHEER);
+            }
+            else if (!urand(0, 2) && creature->GetCreatureTemplate() && creature->GetCreatureTemplate()->rank != CREATURE_ELITE_NORMAL)
+            {
+                bot->HandleEmoteCommand(EMOTE_ONESHOT_CHEER);
+            }
+        }
     }
 
     // randomBotXPRate is now implemented in OnPlayerGiveXP script

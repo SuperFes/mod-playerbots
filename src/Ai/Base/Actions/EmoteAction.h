@@ -49,6 +49,7 @@ public:
     TalkAction(PlayerbotAI* botAI) : EmoteActionBase(botAI, "talk") {}
 
     bool Execute(Event event) override;
+    bool isUseful() override;
     static uint32 GetRandomEmote(Unit* unit, bool textEmote = false);
 };
 

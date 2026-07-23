@@ -89,6 +89,8 @@ bool LootRollAction::Execute(Event /*event*/)
                 vote = PASS;
             else if (sPlayerbotAIConfig.lootNeedRollLevel == 1)
                 vote = GREED;
+            else if (sPlayerbotAIConfig.randomBotEmote && !urand(0, 2))
+                bot->HandleEmoteCommand(EMOTE_ONESHOT_POINT);
         }
         else if (vote == GREED && !sPlayerbotAIConfig.lootGreedRollLevel)
             vote = PASS;

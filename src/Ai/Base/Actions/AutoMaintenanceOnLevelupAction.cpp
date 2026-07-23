@@ -64,6 +64,9 @@ void AutoMaintenanceOnLevelupAction::AutoLearnSpell()
 void AutoMaintenanceOnLevelupAction::LearnSpells(std::ostringstream* out)
 {
     BroadcastHelper::BroadcastLevelup(botAI, bot);
+    if (sPlayerbotAIConfig.randomBotEmote && !urand(0, 1))
+        bot->HandleEmoteCommand(EMOTE_ONESHOT_CHEER);
+
     if (sPlayerbotAIConfig.autoLearnTrainerSpells && sRandomPlayerbotMgr.IsRandomBot(bot))
         LearnTrainerSpells(out);
 
