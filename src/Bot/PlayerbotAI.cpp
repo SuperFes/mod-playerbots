@@ -139,6 +139,9 @@ PlayerbotAI::PlayerbotAI(Player* bot)
     if (!bot->isTaxiCheater() && HasCheat((BotCheatMask::taxi)))
         bot->SetTaxiCheater(true);
 
+    // Implement a random start timer before their first action
+    nextAICheckDelay = urand(500, 5000); // 0.5 to 5.0 seconds
+
     for (uint8 i = 0; i < MAX_ACTIVITY_TYPE; i++)
     {
         allowActiveCheckTimer[i] = 0;
@@ -249,6 +252,12 @@ void PlayerbotAI::UpdateAI(uint32 elapsed, bool minimal)
     if (!bot || !bot->GetSession() || !bot->IsInWorld() || bot->IsBeingTeleported() ||
         bot->GetSession()->isLogingOut() || bot->IsDuringRemoveFromWorld())
         return;
+
+    // If the bot gets attacked and is in combat, bypass any long non-combat delays
+    if (bot->IsInCombat() && nextAICheckDelay > sPlayerbotAIConfig.reactDelay)
+    {
+        nextAICheckDelay = sPlayerbotAIConfig.reactDelay;
+    }
 
     // Handle cheat options (set bot health and power if cheats are enabled)
     if (bot->IsAlive() &&
@@ -657,6 +666,8 @@ void PlayerbotAI::HandleCommand(uint32 type, const std::string& text, Player& fr
     if (filtered.empty())
         return;
 
+    nextAICheckDelay = 0;
+
     if (filtered.substr(0, 6) == "debug ")
     {
         std::string response = HandleRemoteCommand(filtered.substr(6));
@@ -999,6 +1010,8 @@ void PlayerbotAI::HandleCommand(uint32 type, std::string const text, Player* fro
     filtered = chatFilter.Filter(trim(filtered));
     if (filtered.empty())
         return;
+
+    nextAICheckDelay = 0;
 
     if (filtered.substr(0, 6) == "debug ")
     {

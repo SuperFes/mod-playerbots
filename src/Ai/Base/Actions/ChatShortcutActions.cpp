@@ -12,6 +12,32 @@
 #include "Playerbots.h"
 #include "PositionValue.h"
 
+static std::map<std::string, std::string> GetDefaultPlaceholders(PlayerbotAI* botAI, Player* bot, Player* master)
+{
+    std::map<std::string, std::string> placeholders;
+    AreaTableEntry const* current_area = botAI->GetCurrentArea();
+    AreaTableEntry const* current_zone = botAI->GetCurrentZone();
+    placeholders["%area_name"] = current_area ? PlayerbotAI::GetLocalizedAreaName(current_area) : PlayerbotTextMgr::instance().GetBotText("string_unknown_area");
+    placeholders["%zone_name"] = current_zone ? PlayerbotAI::GetLocalizedAreaName(current_zone) : PlayerbotTextMgr::instance().GetBotText("string_unknown_area");
+    placeholders["%my_class"] = botAI->GetChatHelper()->FormatClass(bot->getClass());
+    placeholders["%my_race"] = botAI->GetChatHelper()->FormatRace(bot->getRace());
+    placeholders["%my_level"] = std::to_string(bot->GetLevel());
+
+    if (master)
+    {
+        Unit* target = botAI->GetUnit(master->GetTarget());
+        if (!target)
+            target = bot->GetSelectedUnit();
+        placeholders["%target_name"] = target ? target->GetName() : "target";
+    }
+    else
+    {
+        placeholders["%target_name"] = "target";
+    }
+
+    return placeholders;
+}
+
 void PositionsResetAction::ResetReturnPosition()
 {
     PositionMap& posMap = context->GetValue<PositionMap&>("position")->Get();
@@ -88,7 +114,7 @@ bool FollowChatShortcutAction::Execute(Event /*event*/)
         if (moved)
         {
             botAI->TellMaster(PlayerbotTextMgr::instance().GetBotTextOrDefault(
-                "following", "Following", {}));
+                "following", "Following", GetDefaultPlaceholders(botAI, bot, master)));
             return true;
         }
     }
@@ -112,7 +138,7 @@ bool FollowChatShortcutAction::Execute(Event /*event*/)
     */
 
     botAI->TellMaster(PlayerbotTextMgr::instance().GetBotTextOrDefault(
-        "following", "Following", {}));
+        "following", "Following", GetDefaultPlaceholders(botAI, bot, master)));
     return true;
 }
 
@@ -130,7 +156,7 @@ bool StayChatShortcutAction::Execute(Event /*event*/)
     SetStayPosition(bot->GetPositionX(), bot->GetPositionY(), bot->GetPositionZ());
 
     botAI->TellMaster(PlayerbotTextMgr::instance().GetBotTextOrDefault(
-        "staying", "Staying", {}));
+        "staying", "Staying", GetDefaultPlaceholders(botAI, bot, master)));
     return true;
 }
 
@@ -146,7 +172,7 @@ bool MoveFromGroupChatShortcutAction::Execute(Event /*event*/)
     botAI->ChangeStrategy("+move from group", BOT_STATE_COMBAT);
 
     botAI->TellMaster(PlayerbotTextMgr::instance().GetBotTextOrDefault(
-        "move_from_group", "Moving away from group", {}));
+        "move_from_group", "Moving away from group", GetDefaultPlaceholders(botAI, bot, master)));
     return true;
 }
 
@@ -166,12 +192,12 @@ bool FleeChatShortcutAction::Execute(Event /*event*/)
     if (bot->GetMapId() != master->GetMapId() || bot->GetDistance(master) > sPlayerbotAIConfig.sightDistance)
     {
         botAI->TellError(PlayerbotTextMgr::instance().GetBotTextOrDefault(
-            "fleeing_far", "I will not flee with you - too far away", {}));
+            "fleeing_far", "I will not flee with you - too far away", GetDefaultPlaceholders(botAI, bot, master)));
         return true;
     }
 
     botAI->TellMaster(PlayerbotTextMgr::instance().GetBotTextOrDefault(
-        "fleeing", "Fleeing", {}));
+        "fleeing", "Fleeing", GetDefaultPlaceholders(botAI, bot, master)));
     return true;
 }
 
@@ -189,7 +215,7 @@ bool GoawayChatShortcutAction::Execute(Event /*event*/)
     ResetStayPosition();
 
     botAI->TellMaster(PlayerbotTextMgr::instance().GetBotTextOrDefault(
-        "running_away", "Running away", {}));
+        "running_away", "Running away", GetDefaultPlaceholders(botAI, bot, master)));
     return true;
 }
 
@@ -206,7 +232,7 @@ bool GrindChatShortcutAction::Execute(Event /*event*/)
     ResetStayPosition();
 
     botAI->TellMaster(PlayerbotTextMgr::instance().GetBotTextOrDefault(
-        "grinding", "Grinding", {}));
+        "grinding", "Grinding", GetDefaultPlaceholders(botAI, bot, master)));
     return true;
 }
 
@@ -227,7 +253,7 @@ bool TankAttackChatShortcutAction::Execute(Event /*event*/)
     ResetStayPosition();
 
     botAI->TellMaster(PlayerbotTextMgr::instance().GetBotTextOrDefault(
-        "attacking", "Attacking", {}));
+        "attacking", "Attacking", GetDefaultPlaceholders(botAI, bot, master)));
     return true;
 }
 

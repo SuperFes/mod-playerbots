@@ -2810,90 +2810,104 @@ void RandomPlayerbotMgr::PrintStats()
             botAI->rpgStatistic = NewRpgStatistic();
         }
     }
+    // --- Compact table output ---
 
-    LOG_INFO("playerbots", "Bots level:");
-    // uint32 maxLevel = sWorld->getIntConfig(CONFIG_MAX_PLAYER_LEVEL);
-    uint32_t currentAlliance = 0, currentHorde = 0;
-    uint32_t step = std::max(1, static_cast<int>((maxBotLevel + 4) / 8));
-    uint32_t from = 1;
+    // Abbreviation maps for races and classes
+    static const std::map<uint8, const char*> raceAbbr = {
+        {RACE_HUMAN,        "Hum"}, {RACE_DWARF,        "Dwa"}, {RACE_NIGHTELF,     "Nel"},
+        {RACE_GNOME,        "Gno"}, {RACE_DRAENEI,      "Dra"}, {RACE_ORC,          "Orc"},
+        {RACE_UNDEAD_PLAYER,"Und"}, {RACE_TAUREN,       "Tau"}, {RACE_TROLL,        "Trl"},
+        {RACE_BLOODELF,     "Bel"},
+    };
+    static const std::map<uint8, const char*> classAbbr = {
+        {CLASS_WARRIOR,     "War"}, {CLASS_PALADIN,     "Pal"}, {CLASS_HUNTER,      "Hnt"},
+        {CLASS_ROGUE,       "Rog"}, {CLASS_PRIEST,      "Pri"}, {CLASS_DEATH_KNIGHT,"DK "},
+        {CLASS_SHAMAN,      "Sha"}, {CLASS_MAGE,        "Mag"}, {CLASS_WARLOCK,     "Wlk"},
+        {CLASS_DRUID,       "Dru"},
+    };
 
-    for (uint8 i = 1; i <= maxBotLevel; ++i)
+    // Level distribution — group into 8 even buckets, all on one line
     {
-        currentAlliance += alliance[i];
-        currentHorde += horde[i];
-
-        if (((i + 1) % step == 0) || i == maxBotLevel)
+        uint32_t step = std::max(1, static_cast<int>((maxBotLevel + 4) / 8));
+        uint32_t currentAlliance = 0, currentHorde = 0, from = 1;
+        std::ostringstream lvlLine;
+        lvlLine << "Levels  ";
+        bool first = true;
+        for (uint8 i = 1; i <= maxBotLevel; ++i)
         {
-            if (currentAlliance || currentHorde)
-                LOG_INFO("playerbots", "    {}..{}: {} alliance, {} horde", from, i, currentAlliance, currentHorde);
-            currentAlliance = 0;
-            currentHorde = 0;
-            from = i + 1;
+            currentAlliance += alliance[i];
+            currentHorde += horde[i];
+            if (((i + 1) % step == 0) || i == maxBotLevel)
+            {
+                if (currentAlliance || currentHorde)
+                {
+                    if (!first) lvlLine << "  ";
+                    lvlLine << static_cast<uint32>(from) << "-" << static_cast<uint32>(i)
+                            << " A:" << currentAlliance << " H:" << currentHorde;
+                    first = false;
+                }
+                currentAlliance = 0;
+                currentHorde = 0;
+                from = i + 1;
+            }
         }
+        LOG_INFO("playerbots", "{}", lvlLine.str());
     }
 
-    LOG_INFO("playerbots", "Bots race:");
-    for (uint8 race = RACE_HUMAN; race < sRaceMgr->GetMaxRaces(); ++race)
+    // Roles and engine state on one line each
+    LOG_INFO("playerbots", "Roles   Tank:{:<4} Heal:{:<4} DPS:{:<4}  |  Engine  NonCombat:{} Combat:{} Dead:{}",
+        tank, heal, dps, engine_noncombat, engine_combat, engine_dead);
+
+    // All status flags on one line
+    LOG_INFO("playerbots", "Status  Active:{} Moving:{} Combat:{} Dead:{} Flight:{} Mount:{} BG:{} Rest:{}",
+        active, moving, combat, dead, inFlight, mounted, inBg, rest);
+
+    // Race distribution — all on one line, only populated races shown
     {
-        if (perRace[race])
+        std::ostringstream raceLine;
+        raceLine << "Race    ";
+        bool first = true;
+        for (uint8 race = RACE_HUMAN; race < sRaceMgr->GetMaxRaces(); ++race)
         {
-            uint32 lvl = lvlPerRace[race] * 10 / perRace[race];
-            float flvl = lvl / 10.0f;
-            LOG_INFO("playerbots", "    {}: {}, avg lvl: {}", ChatHelper::FormatRace(race).c_str(), perRace[race],
-                     flvl);
+            if (!perRace[race]) continue;
+            float avgLvl = lvlPerRace[race] / static_cast<float>(perRace[race]);
+            const char* abbr = raceAbbr.count(race) ? raceAbbr.at(race) : "???";
+            if (!first) raceLine << "  ";
+            raceLine << abbr << ":" << perRace[race] << "(" << std::fixed << std::setprecision(1) << avgLvl << ")";
+            first = false;
         }
+        LOG_INFO("playerbots", "{}", raceLine.str());
     }
 
-    LOG_INFO("playerbots", "Bots class:");
-    for (uint8 cls = CLASS_WARRIOR; cls < MAX_CLASSES; ++cls)
+    // Class distribution — all on one line, only populated classes shown
     {
-        if (perClass[cls])
+        std::ostringstream clsLine;
+        clsLine << "Class   ";
+        bool first = true;
+        for (uint8 cls = CLASS_WARRIOR; cls < MAX_CLASSES; ++cls)
         {
-            uint32 lvl = lvlPerClass[cls] * 10 / perClass[cls];
-            float flvl = lvl / 10.0f;
-            LOG_INFO("playerbots", "    {}: {}, avg lvl: {}", ChatHelper::FormatClass(cls).c_str(), perClass[cls],
-                     flvl);
+            if (!perClass[cls]) continue;
+            float avgLvl = lvlPerClass[cls] / static_cast<float>(perClass[cls]);
+            const char* abbr = classAbbr.count(cls) ? classAbbr.at(cls) : "???";
+            if (!first) clsLine << "  ";
+            clsLine << abbr << ":" << perClass[cls] << "(" << std::fixed << std::setprecision(1) << avgLvl << ")";
+            first = false;
         }
+        LOG_INFO("playerbots", "{}", clsLine.str());
     }
 
-    LOG_INFO("playerbots", "Bots role:");
-    LOG_INFO("playerbots", "    tank: {}, heal: {}, dps: {}", tank, heal, dps);
-
-    LOG_INFO("playerbots", "Bots status:");
-    LOG_INFO("playerbots", "    Active: {}", active);
-    LOG_INFO("playerbots", "    Moving: {}", moving);
-
-    // LOG_INFO("playerbots", "Bots to:");
-    // LOG_INFO("playerbots", "    update: {}", update);
-    // LOG_INFO("playerbots", "    randomize: {}", randomize);
-    // LOG_INFO("playerbots", "    teleport: {}", teleport);
-    // LOG_INFO("playerbots", "    change_strategy: {}", changeStrategy);
-    // LOG_INFO("playerbots", "    revive: {}", revive);
-
-    LOG_INFO("playerbots", "    In flight: {}", inFlight);
-    LOG_INFO("playerbots", "    On mount: {}", mounted);
-    LOG_INFO("playerbots", "    In combat: {}", combat);
-    LOG_INFO("playerbots", "    In BG: {}", inBg);
-    LOG_INFO("playerbots", "    In Rest: {}", rest);
-    LOG_INFO("playerbots", "    Dead: {}", dead);
-
+    // RPG strategy status (only when feature is enabled)
     if (sPlayerbotAIConfig.enableNewRpgStrategy)
     {
-        LOG_INFO("playerbots", "Bots rpg status:");
         LOG_INFO("playerbots",
-                 "    Idle: {}, Rest: {}, GoGrind: {}, GoCamp: {}, MoveRandom: {}, MoveNpc: {}, DoQuest: {}, "
-                 "TravelFlight: {}, OutdoorPvP: {}",
-                 rpgStatusCount[RPG_IDLE], rpgStatusCount[RPG_REST], rpgStatusCount[RPG_GO_GRIND],
-                 rpgStatusCount[RPG_GO_CAMP], rpgStatusCount[RPG_WANDER_RANDOM], rpgStatusCount[RPG_WANDER_NPC],
-                 rpgStatusCount[RPG_DO_QUEST], rpgStatusCount[RPG_TRAVEL_FLIGHT], rpgStatusCount[RPG_OUTDOOR_PVP]);
+            "RPG     Idle:{} Rest:{} Grind:{} Camp:{} Wander:{} NPC:{} Quest:{} Flight:{} PvP:{}",
+            rpgStatusCount[RPG_IDLE], rpgStatusCount[RPG_REST], rpgStatusCount[RPG_GO_GRIND],
+            rpgStatusCount[RPG_GO_CAMP], rpgStatusCount[RPG_WANDER_RANDOM], rpgStatusCount[RPG_WANDER_NPC],
+            rpgStatusCount[RPG_DO_QUEST], rpgStatusCount[RPG_TRAVEL_FLIGHT], rpgStatusCount[RPG_OUTDOOR_PVP]);
 
-        LOG_INFO("playerbots", "Bots total quests:");
-        LOG_INFO("playerbots", "    Accepted: {}, Rewarded: {}, Dropped: {}", rpgStasticTotal.questAccepted,
-                 rpgStasticTotal.questRewarded, rpgStasticTotal.questDropped);
+        LOG_INFO("playerbots", "Quests  Accepted:{} Rewarded:{} Dropped:{}",
+            rpgStasticTotal.questAccepted, rpgStasticTotal.questRewarded, rpgStasticTotal.questDropped);
     }
-
-    LOG_INFO("playerbots", "Bots engine:", dead);
-    LOG_INFO("playerbots", "    Non-combat: {}, Combat: {}, Dead: {}", engine_noncombat, engine_combat, engine_dead);
 }
 
 double RandomPlayerbotMgr::GetBuyMultiplier(Player* bot)

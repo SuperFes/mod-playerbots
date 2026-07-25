@@ -11,6 +11,7 @@
 #include "PerfMonitor.h"
 #include "Playerbots.h"
 #include "Queue.h"
+#include "Random.h"
 #include "Strategy.h"
 #include "Timer.h"
 
@@ -217,6 +218,15 @@ bool Engine::DoNextAction(Unit* /*unit*/, uint32 /*depth*/, bool minimal)
                     LogAction("A:%s - OK", action->getName().c_str());
                     MultiplyAndPush(actionNode->getContinuers(), relevance, false, event, "cont");
                     lastRelevance = relevance;
+
+                    // Add a random delay after successful action execution when not in combat to make bots seem more natural
+                    Player* bot = botAI->GetBot();
+                    if (bot && !bot->IsInCombat())
+                    {
+                        uint32 delay = urand(500, 4500); // 0.5 to 4.5 seconds delay
+                        botAI->SetNextCheckDelay(delay);
+                    }
+
                     delete actionNode;  // Safe memory management
                     break;
                 }

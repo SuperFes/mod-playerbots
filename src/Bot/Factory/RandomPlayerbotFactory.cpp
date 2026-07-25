@@ -451,50 +451,29 @@ void RandomPlayerbotFactory::CreateRandomBots()
 
     if (sPlayerbotAIConfig.deleteRandomBotAccounts)
     {
-        std::vector<uint32> botAccounts;
-        std::vector<uint32> botFriends;
-
-        // Calculates the total number of required accounts.
-        uint32 totalAccountCount = CalculateTotalAccountCount();
-
-        for (uint32 accountNumber = 0; accountNumber < totalAccountCount; ++accountNumber)
-        {
-            std::ostringstream out;
-            out << sPlayerbotAIConfig.randomBotAccountPrefix << accountNumber;
-            std::string const accountName = out.str();
-
-            if (uint32 accountId = AccountMgr::GetId(accountName))
-                botAccounts.push_back(accountId);
-        }
-
         LOG_INFO("playerbots", "Deleting all random bot characters and accounts...");
 
-        // First execute all the cleanup SQL commands
-        // Clear playerbots_random_bots and playerbots_account_type
-        PlayerbotsDatabase.Execute("DELETE FROM playerbots_random_bots");
-        PlayerbotsDatabase.Execute("DELETE FROM playerbots_account_type");
-
-        // Get the database names dynamically
+        // Get the database names dynamically for cross-database queries.
+        // Pre-format the full SQL strings to avoid fmt substitution issues with
+        // runtime-concatenated strings that aren't compile-time format literals.
         std::string loginDBName = LoginDatabase.GetConnectionInfo()->database;
         std::string characterDBName = CharacterDatabase.GetConnectionInfo()->database;
 
-        // Delete all characters from bot accounts
-        CharacterDatabase.Execute("DELETE FROM characters WHERE account IN (SELECT id FROM " + loginDBName + ".account WHERE username LIKE '{}%%')",
-            sPlayerbotAIConfig.randomBotAccountPrefix.c_str());
-
-        // Wait for the characters to be deleted before proceeding to dependent deletes
-        while (CharacterDatabase.QueueSize())
-        {
-            std::this_thread::sleep_for(1s);
-        }
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));    // Extra 100ms fixed delay for safety.
+        // Clear playerbots tables first
+        PlayerbotsDatabase.Execute("DELETE FROM playerbots_random_bots");
+        PlayerbotsDatabase.Execute("DELETE FROM playerbots_account_type");
 
         // Clean up orphaned entries in playerbots_guild_tasks
-        PlayerbotsDatabase.Execute("DELETE FROM playerbots_guild_tasks WHERE owner NOT IN (SELECT guid FROM " + characterDBName + ".characters)");
+        PlayerbotsDatabase.Execute(
+            fmt::format("DELETE FROM playerbots_guild_tasks WHERE owner NOT IN (SELECT guid FROM {}.characters)",
+                characterDBName));
 
-        // Clean up orphaned entries in playerbots_db_store
-        PlayerbotsDatabase.Execute("DELETE FROM playerbots_db_store WHERE guid NOT IN (SELECT guid FROM " + characterDBName + ".characters WHERE account IN (SELECT id FROM " + loginDBName + ".account WHERE username NOT LIKE '{}%%'))",
-            sPlayerbotAIConfig.randomBotAccountPrefix.c_str());
+        // Clean up orphaned entries in playerbots_db_store (keep real-player entries)
+        PlayerbotsDatabase.Execute(
+            fmt::format("DELETE FROM playerbots_db_store WHERE guid NOT IN "
+                "(SELECT guid FROM {}.characters WHERE account IN "
+                "(SELECT id FROM {}.account WHERE username NOT LIKE '{}%'))",
+                characterDBName, loginDBName, sPlayerbotAIConfig.randomBotAccountPrefix));
 
         // Clean up orphaned records in character-related tables
         CharacterDatabase.Execute("DELETE FROM arena_team_member WHERE guid NOT IN (SELECT guid FROM characters)");
@@ -546,40 +525,49 @@ void RandomPlayerbotFactory::CreateRandomBots()
         CharacterDatabase.Execute("DELETE FROM petition WHERE ownerguid NOT IN (SELECT guid FROM characters)");
         CharacterDatabase.Execute("DELETE FROM petition_sign WHERE ownerguid NOT IN (SELECT guid FROM characters) OR playerguid NOT IN (SELECT guid FROM characters)");
 
-        // Finally, delete the bot accounts themselves
-        LOG_INFO("playerbots", "Deleting random bot accounts...");
-        QueryResult results = LoginDatabase.Query("SELECT id FROM account WHERE username LIKE '{}%%'",
-                                             sPlayerbotAIConfig.randomBotAccountPrefix.c_str());
-        int32 deletion_count = 0;
-        if (results)
-        {
-            do
-            {
-                Field* fields = results->Fetch();
-                uint32 accId = fields[0].Get<uint32>();
-                LOG_DEBUG("playerbots", "Deleting account accID: {}({})...", accId, ++deletion_count);
-                AccountMgr::DeleteAccount(accId);
-            } while (results->NextRow());
-        }
-
-        uint32 timer = getMSTime();
-
-        // After ALL deletions, make sure data is commited to DB
-        LoginDatabase.Execute("COMMIT");
-        CharacterDatabase.Execute("COMMIT");
-        PlayerbotsDatabase.Execute("COMMIT");
-
-        // Wait for all pending database operations to complete
+        // Wait for all the orphan-cleanup SQL to finish before querying accounts,
+        // so the login DB is in a consistent state for the account deletion loop.
         while (LoginDatabase.QueueSize() || CharacterDatabase.QueueSize() || PlayerbotsDatabase.QueueSize())
         {
             std::this_thread::sleep_for(1s);
         }
         std::this_thread::sleep_for(std::chrono::milliseconds(100));    // Extra 100ms fixed delay for safety.
 
-        // Flush tables to ensure all data in memory are written to disk
-        LoginDatabase.Execute("FLUSH TABLES");
-        CharacterDatabase.Execute("FLUSH TABLES");
-        PlayerbotsDatabase.Execute("FLUSH TABLES");
+        // Delete all bot accounts (and their characters) via AccountMgr::DeleteAccount,
+        // which properly calls Player::DeleteFromDB for each character and removes all
+        // login DB rows. We query the login DB directly by prefix to catch all bot accounts
+        // regardless of any numbering gaps.
+        LOG_INFO("playerbots", "Deleting random bot accounts...");
+        uint32 timer = getMSTime();
+
+        // Snapshot the account IDs synchronously before starting deletions.
+        std::vector<uint32> botAccountIds;
+        {
+            QueryResult accountResults = LoginDatabase.Query(
+                fmt::format("SELECT id FROM account WHERE username LIKE '{}%'",
+                    sPlayerbotAIConfig.randomBotAccountPrefix));
+            if (accountResults)
+            {
+                do
+                {
+                    botAccountIds.push_back(accountResults->Fetch()[0].Get<uint32>());
+                } while (accountResults->NextRow());
+            }
+        }
+
+        int32 deletion_count = 0;
+        for (uint32 accId : botAccountIds)
+        {
+            LOG_DEBUG("playerbots", "Deleting account accID: {}({})...", accId, ++deletion_count);
+            AccountMgr::DeleteAccount(accId);
+        }
+
+        // Wait for all pending database operations to complete
+        while (LoginDatabase.QueueSize() || CharacterDatabase.QueueSize() || PlayerbotsDatabase.QueueSize())
+        {
+            std::this_thread::sleep_for(1s);
+        }
+
 
         LOG_INFO("playerbots", ">> Random bot accounts and data deleted in {} ms", GetMSTimeDiffToNow(timer));
         LOG_INFO("playerbots", "Please reset the AiPlayerbot.DeleteRandomBotAccounts to 0 and restart the server...");

@@ -13,6 +13,7 @@
 #include <iomanip>
 #include <algorithm>
 
+#include "AccountMgr.h"
 #include "ChannelMgr.h"
 #include "CharacterCache.h"
 #include "CharacterPackets.h"
@@ -723,6 +724,51 @@ std::string const PlayerbotHolder::ProcessBotCommand(std::string const cmd, Obje
         LogoutPlayerBot(guid);
         return "ok";
     }
+    else if (cmd == "delete")
+    {
+        // Verify this character belongs to the master's account
+        uint32 botAccountId = sCharacterCache->GetCharacterAccountIdByGuid(guid);
+        if (!botAccountId)
+            return "character not found";
+
+        if (botAccountId != masterAccountId && !admin)
+            return "you can only delete bots from your own account";
+
+        // Safety guard: only allow deletion of characters on bot accounts (accounts with
+        // the randomBotAccountPrefix). This prevents accidental deletion of regular
+        // player characters that share the master's account or a linked real account.
+        if (!admin)
+        {
+            QueryResult accountResult = LoginDatabase.Query(
+                "SELECT username FROM account WHERE id = {}", botAccountId);
+            if (!accountResult)
+                return "could not verify account";
+
+            std::string accountUsername = accountResult->Fetch()[0].Get<std::string>();
+            std::string const& botPrefix = sPlayerbotAIConfig.randomBotAccountPrefix;
+            if (accountUsername.rfind(botPrefix, 0) != 0)
+            {
+                return "cannot delete characters from non-bot accounts";
+            }
+        }
+
+        // If the bot is currently online as a playerbot, log it out cleanly first
+        if (Player* bot = GetPlayerBot(guid))
+        {
+            LogoutPlayerBot(guid);
+        }
+        else if (Player* bot = ObjectAccessor::FindPlayer(guid))
+        {
+            // Bot is online but not owned by this manager (e.g. being controlled elsewhere)
+            return "bot is currently online and cannot be deleted";
+        }
+
+        // Permanently delete the character and all associated data
+        std::string botName;
+        sCharacterCache->GetCharacterNameByGuid(guid, botName);
+        Player::DeleteFromDB(guid.GetCounter(), botAccountId, true, true);
+        return "deleted: " + botName;
+    }
 
     // if (admin)
     // {
@@ -908,8 +954,9 @@ std::vector<std::string> PlayerbotHolder::HandlePlayerbotCommand(char const* arg
 
     if (!*args)
     {
-        messages.push_back("usage: list/reload/tweak/self or add/addaccount/init/remove PLAYERNAME\n");
+        messages.push_back("usage: list/reload/tweak/self or add/addaccount/init/remove/delete PLAYERNAME\n");
         messages.push_back("usage: addclass CLASSNAME [male|female|0|1]");
+        messages.push_back("usage: delete * (deletes all bots on your account)");
         return messages;
     }
 
@@ -919,7 +966,7 @@ std::vector<std::string> PlayerbotHolder::HandlePlayerbotCommand(char const* arg
 
     if (!cmd)
     {
-        messages.push_back("usage: list/reload/tweak/self or add/init/remove PLAYERNAME or addclass CLASSNAME [male|female]");
+        messages.push_back("usage: list/reload/tweak/self or add/init/remove/delete PLAYERNAME or addclass CLASSNAME [male|female]");
         return messages;
     }
 
@@ -1215,24 +1262,65 @@ std::vector<std::string> PlayerbotHolder::HandlePlayerbotCommand(char const* arg
     std::unordered_set<std::string> bots;
     if (charnameStr == "*" && master)
     {
-        Group* group = master->GetGroup();
-        if (!group)
+        if (cmdStr == "delete")
         {
-            messages.push_back("you must be in group");
-            return messages;
+            // For delete *, target only characters on bot accounts (accounts whose
+            // username starts with randomBotAccountPrefix) that are linked to this
+            // master account. This prevents accidental deletion of regular player
+            // characters that share the master's own account.
+            std::string loginDBName = LoginDatabase.GetConnectionInfo()->database;
+            std::string const& botPrefix = sPlayerbotAIConfig.randomBotAccountPrefix;
+            uint32 masterAccountId = master->GetSession()->GetAccountId();
+
+            // Collect all bot-prefix account IDs that are linked to the master.
+            // A bot account linked to this master is one where:
+            //   playerbots_account_links.account_id = masterAccountId AND
+            //   playerbots_account_links.linked_account_id has a bot-prefix username.
+            QueryResult botAccountResults = PlayerbotsDatabase.Query(
+                fmt::format(
+                    "SELECT pal.linked_account_id FROM playerbots_account_links pal "
+                    "JOIN {}.account a ON a.id = pal.linked_account_id "
+                    "WHERE pal.account_id = {} AND a.username LIKE '{}%'",
+                    loginDBName, masterAccountId, botPrefix));
+
+            if (botAccountResults)
+            {
+                do
+                {
+                    uint32 botAccId = (*botAccountResults)[0].Get<uint32>();
+                    QueryResult charResults = CharacterDatabase.Query(
+                        "SELECT name FROM characters WHERE account = {}", botAccId);
+                    if (charResults)
+                    {
+                        do
+                        {
+                            bots.insert((*charResults)[0].Get<std::string>());
+                        } while (charResults->NextRow());
+                    }
+                } while (botAccountResults->NextRow());
+            }
         }
-
-        Group::MemberSlotList slots = group->GetMemberSlots();
-        for (Group::member_citerator i = slots.begin(); i != slots.end(); i++)
+        else
         {
-            ObjectGuid member = i->guid;
+            Group* group = master->GetGroup();
+            if (!group)
+            {
+                messages.push_back("you must be in group");
+                return messages;
+            }
 
-            if (member == master->GetGUID())
-                continue;
+            Group::MemberSlotList slots = group->GetMemberSlots();
+            for (Group::member_citerator i = slots.begin(); i != slots.end(); i++)
+            {
+                ObjectGuid member = i->guid;
 
-            std::string bot;
-            if (sCharacterCache->GetCharacterNameByGuid(member, bot))
-                bots.insert(bot);
+                if (member == master->GetGUID())
+                    continue;
+
+                std::string bot;
+                if (sCharacterCache->GetCharacterNameByGuid(member, bot))
+                    bots.insert(bot);
+            }
         }
     }
 
@@ -1246,7 +1334,9 @@ std::vector<std::string> PlayerbotHolder::HandlePlayerbotCommand(char const* arg
         }
     }
 
+    // Wildcard tokens ('*' and '!') already populated 'bots' above — skip the per-name lookup loop.
     std::vector<std::string> chars = split(charnameStr, ',');
+    if (charnameStr != "*" && charnameStr != "!")
     for (std::vector<std::string>::iterator i = chars.begin(); i != chars.end(); i++)
     {
         std::string s = *i;
