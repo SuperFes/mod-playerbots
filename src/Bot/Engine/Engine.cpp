@@ -219,11 +219,14 @@ bool Engine::DoNextAction(Unit* /*unit*/, uint32 /*depth*/, bool minimal)
                     MultiplyAndPush(actionNode->getContinuers(), relevance, false, event, "cont");
                     lastRelevance = relevance;
 
-                    // Add a random delay after successful action execution when not in combat to make bots seem more natural
+                    // Add a modest random delay after successful action execution when not in combat to make bots
+                    // seem more natural. Keep the upper bound low (800ms) so bots aren't frozen between pulls.
+                    // Guard on currentState as well to cover the one-tick window where IsInCombat() may not yet
+                    // be true right after killing the last mob.
                     Player* bot = botAI->GetBot();
-                    if (bot && !bot->IsInCombat())
+                    if (bot && !bot->IsInCombat() && botAI->GetState() != BOT_STATE_COMBAT)
                     {
-                        uint32 delay = urand(500, 4500); // 0.5 to 4.5 seconds delay
+                        uint32 delay = urand(200, 800); // 0.2 to 0.8 seconds
                         botAI->SetNextCheckDelay(delay);
                     }
 
