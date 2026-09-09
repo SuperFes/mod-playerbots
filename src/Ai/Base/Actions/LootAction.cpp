@@ -13,6 +13,7 @@
 #include "LootObjectStack.h"
 #include "LootStrategyValue.h"
 #include "PlayerbotAIConfig.h"
+#include "Corpse.h"
 #include "Playerbots.h"
 #include "ServerFacade.h"
 #include "GuildMgr.h"
@@ -87,6 +88,25 @@ bool OpenLootAction::DoLoot(LootObject& lootObject)
     if (lootObject.IsEmpty())
         return false;
 
+    Corpse* playerCorpse = bot->GetCorpse();
+    if (playerCorpse && playerCorpse->GetGUID() == lootObject.guid)
+    {
+        if (bot->GetDistance(playerCorpse) > INTERACTION_DISTANCE - 2.0f)
+            return false;
+
+        if (bot->IsMounted())
+        {
+            bot->Dismount();
+            botAI->SetNextCheckDelay(sPlayerbotAIConfig.lootDelay);
+        }
+
+        WorldPacket* packet = new WorldPacket(CMSG_LOOT, 8);
+        *packet << lootObject.guid;
+        bot->GetSession()->QueuePacket(packet);
+        botAI->SetNextCheckDelay(sPlayerbotAIConfig.lootDelay);
+        return true;
+    }
+
     Creature* creature = botAI->GetCreature(lootObject.guid);
     if (creature && bot->GetDistance(creature) > INTERACTION_DISTANCE - 2.0f)
         return false;
@@ -155,7 +175,13 @@ bool OpenLootAction::DoLoot(LootObject& lootObject)
 
     uint32 spellId = GetOpeningSpell(lootObject);
     if (!spellId)
-        return false;
+    {
+        WorldPacket* packet = new WorldPacket(CMSG_LOOT, 8);
+        *packet << lootObject.guid;
+        bot->GetSession()->QueuePacket(packet);
+        botAI->SetNextCheckDelay(sPlayerbotAIConfig.lootDelay);
+        return true;
+    }
 
     return botAI->CastSpell(spellId, bot);
 }
@@ -207,19 +233,19 @@ uint32 OpenLootAction::GetOpeningSpell(LootObject& lootObject, GameObject* go)
 
 bool OpenLootAction::CanOpenLock(LootObject& /*lootObject*/, SpellInfo const* spellInfo, GameObject* go)
 {
+    uint32 lockId = go->GetGOInfo()->GetLockId();
+    if (!lockId)
+        return false;
+
+    LockEntry const* lockInfo = sLockStore.LookupEntry(lockId);
+    if (!lockInfo)
+        return false;
+
     for (uint8 effIndex = 0; effIndex <= EFFECT_2; effIndex++)
     {
         if (spellInfo->Effects[effIndex].Effect != SPELL_EFFECT_OPEN_LOCK &&
             spellInfo->Effects[effIndex].Effect != SPELL_EFFECT_SKINNING)
-            return false;
-
-        uint32 lockId = go->GetGOInfo()->GetLockId();
-        if (!lockId)
-            return false;
-
-        LockEntry const* lockInfo = sLockStore.LookupEntry(lockId);
-        if (!lockInfo)
-            return false;
+            continue;
 
         for (uint8 j = 0; j < 8; ++j)
         {
@@ -444,10 +470,10 @@ bool StoreLootAction::Execute(Event event)
         // bot->GetSession()->HandleAutostoreLootItemOpcode(packet);
         botAI->SetNextCheckDelay(sPlayerbotAIConfig.lootDelay);
 
-        if (proto->Quality > ITEM_QUALITY_NORMAL && !urand(0, 50) && botAI->HasStrategy("emote", BOT_STATE_NON_COMBAT) && sPlayerbotAIConfig.randomBotEmote)
+        if (proto->Quality > ITEM_QUALITY_NORMAL && botAI->RollSocial(50) && botAI->HasStrategy("emote", BOT_STATE_NON_COMBAT) && sPlayerbotAIConfig.randomBotEmote)
             botAI->PlayEmote(TEXT_EMOTE_CHEER);
 
-        if (proto->Quality >= ITEM_QUALITY_RARE && !urand(0, 1) && botAI->HasStrategy("emote", BOT_STATE_NON_COMBAT) && sPlayerbotAIConfig.randomBotEmote)
+        if (proto->Quality >= ITEM_QUALITY_RARE && botAI->RollSocial(1) && botAI->HasStrategy("emote", BOT_STATE_NON_COMBAT) && sPlayerbotAIConfig.randomBotEmote)
             botAI->PlayEmote(TEXT_EMOTE_CHEER);
 
         BroadcastHelper::BroadcastLootingItem(botAI, bot, proto);

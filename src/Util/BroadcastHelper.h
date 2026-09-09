@@ -29,7 +29,11 @@ public:
         TO_LOOKING_FOR_GROUP = 5,
         TO_LOCAL_DEFENSE = 6,
         TO_WORLD_DEFENSE = 7,
-        TO_GUILD_RECRUITMENT = 8
+        TO_GUILD_RECRUITMENT = 8,
+        // Party and local /say. PlayerbotAI has always had SayToParty()/Say(); the broadcast system
+        // just had no way to target them, which is why bots never spoke in either.
+        TO_PARTY = 9,
+        TO_SAY = 10
     };
 
     static uint8_t GetLocale();

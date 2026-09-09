@@ -13,6 +13,11 @@
 #include "AiFactory.h"
 #include "ChatHelper.h"
 #include "Playerbots.h"
+
+// Was urand(300, 600) plus up to 300s of jitter - 5 to 15 minutes per bot, which read as silence.
+// PlayerbotAI::SocialCooldown scales these by the bot's chattiness and AiPlayerbot.SocialCooldownScale.
+static constexpr uint32 SUGGEST_COOLDOWN_MIN = 90;
+static constexpr uint32 SUGGEST_COOLDOWN_MAX = 240;
 #include "BroadcastHelper.h"
 #include "AiFactory.h"
 #include "ChatHelper.h"
@@ -64,8 +69,8 @@ bool SuggestWhatToDoAction::Execute(Event /*event*/)
     fnct_ptr();
 
     std::string const qualifier = "suggest what to do";
-    uint32 guidJitter = (bot->GetGUID().GetCounter() % 300);
-    botAI->GetAiObjectContext()->GetValue<time_t>("last said", qualifier)->Set(time(nullptr) + urand(300, 600) + guidJitter);
+    botAI->GetAiObjectContext()->GetValue<time_t>("last said", qualifier)
+        ->Set(time(nullptr) + botAI->SocialCooldown(SUGGEST_COOLDOWN_MIN, SUGGEST_COOLDOWN_MAX));
 
     return true;
 }
@@ -258,8 +263,8 @@ bool SuggestDungeonAction::Execute(Event /*event*/)
     // TODO: use PlayerbotDungeonRepository::instance()
 
     std::string const qualifier = "suggest what to do";
-    uint32 guidJitter = (bot->GetGUID().GetCounter() % 300);
-    botAI->GetAiObjectContext()->GetValue<time_t>("last said", qualifier)->Set(time(nullptr) + urand(300, 600) + guidJitter);
+    botAI->GetAiObjectContext()->GetValue<time_t>("last said", qualifier)
+        ->Set(time(nullptr) + botAI->SocialCooldown(SUGGEST_COOLDOWN_MIN, SUGGEST_COOLDOWN_MAX));
 
     if (!sPlayerbotAIConfig.randomBotSuggestDungeons || bot->GetGroup())
         return false;
@@ -327,8 +332,8 @@ SuggestTradeAction::SuggestTradeAction(PlayerbotAI* botAI) : SuggestWhatToDoActi
 bool SuggestTradeAction::Execute(Event /*event*/)
 {
     std::string const qualifier = "suggest what to do";
-    uint32 guidJitter = (bot->GetGUID().GetCounter() % 300);
-    botAI->GetAiObjectContext()->GetValue<time_t>("last said", qualifier)->Set(time(nullptr) + urand(300, 600) + guidJitter);
+    botAI->GetAiObjectContext()->GetValue<time_t>("last said", qualifier)
+        ->Set(time(nullptr) + botAI->SocialCooldown(SUGGEST_COOLDOWN_MIN, SUGGEST_COOLDOWN_MAX));
 
     uint32 quality = urand(0, 100);
     if (quality > 95)

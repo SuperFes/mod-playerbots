@@ -59,6 +59,18 @@ public:
     std::string const getName() override { return "worldbuff"; }
 };
 
+// Idle-time puttering: crafting, recipes and enchanting are all in-place, so this never moves the bot
+// and cannot pull it away from the group. Walking to trainers and vendors is a separate problem.
+class TradeskillStrategy : public Strategy
+{
+public:
+    TradeskillStrategy(PlayerbotAI* botAI) : Strategy(botAI) {}
+
+    uint32 GetType() const override { return STRATEGY_TYPE_NONCOMBAT; }
+    void InitTriggers(std::vector<TriggerNode*>& triggers) override;
+    std::string const getName() override { return "tradeskill"; }
+};
+
 class MasterFishingStrategy : public Strategy
 {
 public:

@@ -109,6 +109,7 @@ public:
         creators["isle"] = &StrategyContext::isle;
         creators["arena"] = &StrategyContext::arena;
         creators["mount"] = &StrategyContext::mount;
+        creators["tradeskill"] = &StrategyContext::tradeskill;
         creators["rtsc"] = &StrategyContext::rtsc;
         creators["attack tagged"] = &StrategyContext::attack_tagged;
         creators["debug"] = &StrategyContext::debug;
@@ -175,6 +176,7 @@ private:
     static Strategy* possible_adds(PlayerbotAI* botAI) { return new PossibleAddsStrategy(botAI); }
     static Strategy* pull_back(PlayerbotAI* botAI) { return new PullBackStrategy(botAI); }
     static Strategy* mount(PlayerbotAI* botAI) { return new MountStrategy(botAI); }
+    static Strategy* tradeskill(PlayerbotAI* botAI) { return new TradeskillStrategy(botAI); }
     static Strategy* bg(PlayerbotAI* botAI) { return new BGStrategy(botAI); }
     static Strategy* battleground(PlayerbotAI* botAI) { return new BattlegroundStrategy(botAI); }
     static Strategy* warsong(PlayerbotAI* botAI) { return new WarsongStrategy(botAI); }

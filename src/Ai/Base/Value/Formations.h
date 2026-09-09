@@ -12,6 +12,7 @@
 #include "PlayerbotAIConfig.h"
 #include "TravelMgr.h"
 
+class Group;
 class Player;
 class PlayerbotAI;
 
@@ -28,6 +29,13 @@ public:
 
 protected:
     float GetFollowAngle();
+
+private:
+    uint64 GetRosterKey(Player* master, Group* group) const;
+
+    uint64 _cachedRosterKey = 0;
+    float _cachedSlotOffset = 0.0f;
+    bool _slotCacheValid = false;
 };
 
 class FollowFormation : public Formation

@@ -10,8 +10,12 @@
 
 void DpsAssistStrategy::InitTriggers(std::vector<TriggerNode*>& triggers)
 {
+    // Healers pick targets one band below a critical heal (ACTION_CRITICAL_HEAL + 10 = 40), so
+    // target acquisition can never preempt keeping someone alive.
+    float const relevance = PlayerbotAI::IsHeal(botAI->GetBot(), true) ? 29.0f : 50.0f;
+
     triggers.push_back(
-        new TriggerNode("not dps target active", { NextAction("dps assist", 50.0f) }));
+        new TriggerNode("not dps target active", { NextAction("dps assist", relevance) }));
 }
 
 void DpsAoeStrategy::InitTriggers(std::vector<TriggerNode*>& triggers)

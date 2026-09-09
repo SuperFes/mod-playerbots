@@ -85,11 +85,15 @@ bool LootRollAction::Execute(Event /*event*/)
         }
         if (vote == NEED)
         {
-            if (sPlayerbotAIConfig.lootNeedRollLevel == 0 || RollUniqueCheck(proto, bot))
+            if (sPlayerbotAIConfig.lootNeedRollLevel == 0)
                 vote = PASS;
+            else if (RollUniqueCheck(proto, bot))
+                // Already own the unique, so it can't be equipped, but it still has
+                // vendor/disenchant value worth rolling for.
+                vote = sPlayerbotAIConfig.lootGreedRollLevel ? GREED : PASS;
             else if (sPlayerbotAIConfig.lootNeedRollLevel == 1)
                 vote = GREED;
-            else if (sPlayerbotAIConfig.randomBotEmote && !urand(0, 2))
+            else if (sPlayerbotAIConfig.randomBotEmote && botAI->RollSocial(2))
                 bot->HandleEmoteCommand(EMOTE_ONESHOT_POINT);
         }
         else if (vote == GREED && !sPlayerbotAIConfig.lootGreedRollLevel)

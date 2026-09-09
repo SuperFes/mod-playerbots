@@ -6,6 +6,8 @@
 
 #include "Engine.h"
 
+#include <algorithm>
+
 #include "Action.h"
 #include "Event.h"
 #include "PerfMonitor.h"
@@ -223,11 +225,33 @@ bool Engine::DoNextAction(Unit* /*unit*/, uint32 /*depth*/, bool minimal)
                     // seem more natural. Keep the upper bound low (800ms) so bots aren't frozen between pulls.
                     // Guard on currentState as well to cover the one-tick window where IsInCombat() may not yet
                     // be true right after killing the last mob.
+                    // Skip entirely when the bot or master is flying — follow ticks must be continuous
+                    // at flight speed or the bot falls far behind before the next AI update.
                     Player* bot = botAI->GetBot();
                     if (bot && !bot->IsInCombat() && botAI->GetState() != BOT_STATE_COMBAT)
                     {
-                        uint32 delay = urand(200, 800); // 0.2 to 0.8 seconds
-                        botAI->SetNextCheckDelay(delay);
+                        Player* master = botAI->GetMaster();
+                        bool isFollowingMovingMaster = master && botAI->HasActivePlayerMaster() &&
+                            (master->isMoving() || bot->GetDistance(master) > sPlayerbotAIConfig.followDistance);
+
+                        if (!isFollowingMovingMaster)
+                        {
+                            bool airborne = bot->IsFlying() || bot->HasUnitState(UNIT_STATE_IN_FLIGHT);
+                            if (!airborne && master)
+                            {
+                                airborne = master->IsFlying() || master->HasUnitState(UNIT_STATE_IN_FLIGHT);
+                            }
+
+                            if (!airborne)
+                            {
+                                // urand already varies this per action; the trait biases the window so a
+                                // deliberate bot reads as consistently deliberate rather than randomly slow.
+                                float const scaled =
+                                    urand(200, 800) * botAI->GetPersonality().reactionScale;
+
+                                botAI->SetNextCheckDelay(std::clamp<uint32>(static_cast<uint32>(scaled), 150, 1500));
+                            }
+                        }
                     }
 
                     delete actionNode;  // Safe memory management

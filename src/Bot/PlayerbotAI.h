@@ -8,6 +8,7 @@
 
 #include <stack>
 
+#include "BotPersonality.h"
 #include "Chat.h"
 #include "ChatFilter.h"
 #include "ChatHelper.h"
@@ -543,6 +544,8 @@ public:
     bool HasRealPlayerMaster();
     // Bot has a master that is activly playing.
     bool HasActivePlayerMaster();
+    // Bot is tagging along with a real player master who is moving, or who stopped out of range.
+    bool IsTravellingWithMaster();
     // Get the group leader or the master of the bot.
     // Checks if the bot is summoned as alt of a player
     bool IsAlt();
@@ -595,6 +598,22 @@ public:
     std::vector<std::pair<const Quest*, uint32>> GetCurrentQuestsRequiringItemId(uint32 itemId);
     uint32 GetReactDelay();
 
+    // Stable per-bot traits, seeded from the GUID at construction. See BotPersonality.h.
+    BotPersonality const& GetPersonality() const { return _personality; }
+
+    // Never let a personalised delay drop below this, however fast the bot's trait is.
+    static constexpr uint32 MIN_PERSONALISED_DELAY_MS = 50;
+    uint32 PersonaliseDelay(uint32 delay) const;
+
+    // Social behaviour, biased by the bot's chattiness trait. RollSocial replaces the scattered
+    // !urand(0, N) gates; SocialCooldown replaces the duplicated "urand(a, b) + guid jitter" stamps.
+    bool RollSocial(uint32 oneInN) const;
+    uint32 SocialCooldown(uint32 minSeconds, uint32 maxSeconds) const;
+
+    // Seconds since the bot last moved or fought. Waiting on a spawn or standing at a vendor gives
+    // minutes of this, which is time a person would spend on something useful.
+    uint32 GetIdleSeconds() const;
+
     std::vector<const Quest*> GetAllCurrentQuests();
     std::vector<const Quest*> GetCurrentIncompleteQuests();
     std::set<uint32> GetAllCurrentQuestIds();
@@ -607,6 +626,8 @@ public:
     NewRpgStatistic rpgStatistic;
     std::unordered_set<uint32> lowPriorityQuest;
     time_t bgReleaseAttemptTime = 0;
+    time_t lastPetAutocastCheck = 0;
+    ObjectGuid lastPetGUID;
 
     // Schedules a callback to run once after <delayMs> milliseconds.
     void AddTimedEvent(std::function<void()> callback, uint32 delayMs);
@@ -654,6 +675,8 @@ protected:
     Position jumpDestination = Position();
     uint32 nextTransportCheck = 0;
     bool spellInterruptRequested = false;
+    BotPersonality _personality;
+    time_t _lastActiveTime = 0;
 };
 
 #endif

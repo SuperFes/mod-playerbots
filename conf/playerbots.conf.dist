@@ -412,6 +412,26 @@ AiPlayerbot.RpgDistance = 200
 AiPlayerbot.GrindDistance = 75.0
 AiPlayerbot.ReactDistance = 150.0
 
+# When the master dismounts, bots stay mounted until they are within
+# (follow distance * this factor) of them, instead of dismounting on the spot.
+# Values below 1.0 are clamped to 1.0 (a bot parked at follow distance would never dismount).
+AiPlayerbot.DismountFollowDistanceFactor = 1.25
+
+# How strongly each bot's individual personality is expressed. Traits (reaction speed, personal
+# space in formation, how eagerly it dismounts, how talkative it is) are derived from the bot's
+# GUID, so a character behaves like the same individual across restarts.
+# 0.0 = all bots identical (previous behaviour), 1.0 = default spread, 2.0 = exaggerated.
+AiPlayerbot.PersonalityStrength = 1.0
+
+# Multiplies how long bots wait between social actions (suggestions, emotes, chatter).
+# Lower is more talkative: 0.5 is twice as chatty, 2.0 is half. Each bot's own chattiness trait
+# scales this further, so PersonalityStrength widens the spread between quiet and loud bots.
+AiPlayerbot.SocialCooldownScale = 1.0
+
+# Seconds a bot must stand still and out of combat before it starts working on its tradeskills
+# (crafting, recipes, enchanting, disenchanting). All of it is done in place - bots never walk off.
+AiPlayerbot.TradeskillIdleSeconds = 30
+
 #
 #
 ####################################################################################################
@@ -2248,6 +2268,8 @@ AiPlayerbot.BroadcastToWorldGlobalChance = 30000
 AiPlayerbot.BroadcastToGeneralGlobalChance = 30000
 AiPlayerbot.BroadcastToTradeGlobalChance = 30000
 AiPlayerbot.BroadcastToLFGGlobalChance = 30000
+AiPlayerbot.BroadcastToPartyGlobalChance = 30000
+AiPlayerbot.BroadcastToSayGlobalChance = 30000
 AiPlayerbot.BroadcastToLocalDefenseGlobalChance = 30000
 AiPlayerbot.BroadcastToWorldDefenseGlobalChance = 30000
 AiPlayerbot.BroadcastToGuildRecruitmentGlobalChance = 30000

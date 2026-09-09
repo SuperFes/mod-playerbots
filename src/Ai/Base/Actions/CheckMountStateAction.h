@@ -57,6 +57,7 @@ private:
     void ClearStaleFlightFlags();
     bool ShouldFollowMasterMountState(Player* master, bool noAttackers, bool shouldMount) const;
     bool ShouldDismountForMaster(Player* master) const;
+    bool IsInFollowPosition(Player* master) const;
     int32 CalculateMasterMountSpeed(Player* master) const;
     bool CheckForSwiftMount() const;
     std::map<uint32, std::map<int32, std::vector<uint32>>> GetAllMountSpells() const;

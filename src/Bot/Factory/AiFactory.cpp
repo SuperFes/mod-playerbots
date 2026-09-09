@@ -9,6 +9,7 @@
 #include "BattlegroundMgr.h"
 #include "DKAiObjectContext.h"
 #include "DruidAiObjectContext.h"
+#include "CollisionValue.h"
 #include "Engine.h"
 #include "Group.h"
 #include "HunterAiObjectContext.h"
@@ -583,7 +584,8 @@ void AiFactory::AddDefaultNonCombatStrategies(Player* player, PlayerbotAI* const
     if (!player->InBattleground())
     {
         nonCombatEngine->addStrategiesNoInit("nc", "food", "chat", "follow", "default", "quest", "loot",
-                                            "gather", "duel", "pvp", "buff", "mount", "emote", nullptr);
+                                            "gather", "duel", "pvp", "buff", "mount", "emote", "collision",
+                                            "tradeskill", nullptr);
     }
 
     if (sPlayerbotAIConfig.autoSaveMana && PlayerbotAI::IsHeal(player, true))

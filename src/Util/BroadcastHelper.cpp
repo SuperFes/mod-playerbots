@@ -128,6 +128,26 @@ bool BroadcastHelper::BroadcastToChannelWithGlobalChance(PlayerbotAI* ai, std::s
                 }
                 break;
             }
+            case TO_PARTY:
+            {
+                if (roll <= chance
+                    && broadcastRoll <= sPlayerbotAIConfig.broadcastToPartyGlobalChance
+                    && ai->SayToParty(message))
+                {
+                    return true;
+                }
+                break;
+            }
+            case TO_SAY:
+            {
+                if (roll <= chance
+                    && broadcastRoll <= sPlayerbotAIConfig.broadcastToSayGlobalChance
+                    && ai->Say(message))
+                {
+                    return true;
+                }
+                break;
+            }
             case TO_LOCAL_DEFENSE:
             {
                 if (roll <= chance
@@ -187,7 +207,7 @@ bool BroadcastHelper::BroadcastLootingItem(PlayerbotAI* ai, Player* bot, ItemTem
             Player* member = gref->GetSource();
             if (member && member != bot && GET_PLAYERBOT_AI(member))
             {
-                if (sPlayerbotAIConfig.randomBotEmote && !urand(0, 1))
+                if (sPlayerbotAIConfig.randomBotEmote && ai->RollSocial(1))
                 {
                     member->SetFacingToObject(bot);
                     member->HandleEmoteCommand(EMOTE_ONESHOT_APPLAUD);
@@ -234,7 +254,7 @@ bool BroadcastHelper::BroadcastLootingItem(PlayerbotAI* ai, Player* bot, ItemTem
                 return BroadcastToChannelWithGlobalChance(
                     ai,
                     PlayerbotTextMgr::instance().GetBotText("broadcast_looting_item_rare", placeholders),
-                    { {TO_GUILD, 50}, {TO_WORLD, 50}, {TO_GENERAL, 100} }
+                    { {TO_PARTY, 100}, {TO_GUILD, 50}, {TO_WORLD, 50}, {TO_GENERAL, 100} }
                 );
             }
             break;
@@ -244,7 +264,7 @@ bool BroadcastHelper::BroadcastLootingItem(PlayerbotAI* ai, Player* bot, ItemTem
                 return BroadcastToChannelWithGlobalChance(
                     ai,
                     PlayerbotTextMgr::instance().GetBotText("broadcast_looting_item_epic", placeholders),
-                    { {TO_GUILD, 50}, {TO_WORLD, 50}, {TO_GENERAL, 100} }
+                    { {TO_PARTY, 100}, {TO_GUILD, 50}, {TO_WORLD, 50}, {TO_GENERAL, 100} }
                 );
             }
             break;
@@ -254,7 +274,7 @@ bool BroadcastHelper::BroadcastLootingItem(PlayerbotAI* ai, Player* bot, ItemTem
                 return BroadcastToChannelWithGlobalChance(
                     ai,
                     PlayerbotTextMgr::instance().GetBotText("broadcast_looting_item_legendary", placeholders),
-                    { {TO_GUILD, 50}, {TO_WORLD, 50}, {TO_GENERAL, 100} }
+                    { {TO_PARTY, 100}, {TO_GUILD, 50}, {TO_WORLD, 50}, {TO_GENERAL, 100} }
                 );
             }
             break;
@@ -264,7 +284,7 @@ bool BroadcastHelper::BroadcastLootingItem(PlayerbotAI* ai, Player* bot, ItemTem
                 return BroadcastToChannelWithGlobalChance(
                     ai,
                     PlayerbotTextMgr::instance().GetBotText("broadcast_looting_item_artifact", placeholders),
-                    { {TO_GUILD, 50}, {TO_WORLD, 50}, {TO_GENERAL, 100} }
+                    { {TO_PARTY, 100}, {TO_GUILD, 50}, {TO_WORLD, 50}, {TO_GENERAL, 100} }
                 );
             }
             break;
@@ -495,7 +515,7 @@ bool BroadcastHelper::BroadcastKill(PlayerbotAI* ai, Player* bot, Creature *crea
     }
     else if (creature->IsPlayer())
     {
-        if (sPlayerbotAIConfig.randomBotEmote && !urand(0, 1))
+        if (sPlayerbotAIConfig.randomBotEmote && ai->RollSocial(1))
         {
             ai->GetBot()->HandleEmoteCommand(urand(0, 1) ? EMOTE_ONESHOT_ROAR : EMOTE_ONESHOT_LAUGH);
         }
@@ -595,7 +615,7 @@ bool BroadcastHelper::BroadcastLevelup(PlayerbotAI* ai, Player* bot)
 
             if (GET_PLAYERBOT_AI(member))
             {
-                if (sPlayerbotAIConfig.randomBotEmote && !urand(0, 1))
+                if (sPlayerbotAIConfig.randomBotEmote && ai->RollSocial(1))
                 {
                     member->SetFacingToObject(bot);
                     member->HandleEmoteCommand(urand(0, 1) ? EMOTE_ONESHOT_CHEER : EMOTE_ONESHOT_APPLAUD);
@@ -844,9 +864,15 @@ bool BroadcastHelper::BroadcastSuggestSell(PlayerbotAI* ai, const ItemTemplate* 
 
         std::map<std::string, std::string> placeholders;
         placeholders["%item_link"] = ai->GetChatHelper()->FormatItem(proto, 0);
+        placeholders["%item"] = placeholders["%item_link"];
         placeholders["%item_formatted_link"] = ai->GetChatHelper()->FormatItem(proto, count);
+        placeholders["%item_formatted_link_link"] = placeholders["%item_formatted_link"];
+        placeholders["%item_formatted_links"] = placeholders["%item_formatted_link"];
+        placeholders["%Item_formatted_link"] = placeholders["%item_formatted_link"];
         placeholders["%item_count"] = std::to_string(count);
+        placeholders["%count"] = placeholders["%item_count"];
         placeholders["%cost_gold"] = ai->GetChatHelper()->formatMoney(price);
+        placeholders["%price"] = placeholders["%cost_gold"];
 
         placeholders["%my_class"] = ai->GetChatHelper()->FormatClass(bot->getClass());
         placeholders["%my_race"] = ai->GetChatHelper()->FormatRace(bot->getRace());
@@ -878,6 +904,9 @@ bool BroadcastHelper::BroadcastSuggestSomething(PlayerbotAI* ai, Player* bot)
         placeholders["%my_class"] = ai->GetChatHelper()->FormatClass(bot->getClass());
         placeholders["%my_race"] = ai->GetChatHelper()->FormatRace(bot->getRace());
         placeholders["%my_level"] = std::to_string(bot->GetLevel());
+
+        std::vector<Item*> botItems = ai->GetInventoryAndEquippedItems();
+        placeholders["%item_link"] = botItems.size() > 0 ? ai->GetChatHelper()->FormatItem(botItems[rand() % botItems.size()]->GetTemplate()) : PlayerbotTextMgr::instance().GetBotText("string_empty_link");
 
         return BroadcastToChannelWithGlobalChance(
             ai,

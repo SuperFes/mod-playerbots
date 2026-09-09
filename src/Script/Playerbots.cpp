@@ -88,10 +88,55 @@ public:
         PLAYERHOOK_CAN_PLAYER_USE_PRIVATE_CHAT,
         PLAYERHOOK_CAN_PLAYER_USE_GROUP_CHAT,
         PLAYERHOOK_CAN_PLAYER_USE_GUILD_CHAT,
-        PLAYERHOOK_CAN_PLAYER_USE_CHANNEL_CHAT,
         PLAYERHOOK_ON_GIVE_EXP,
-        PLAYERHOOK_ON_BEFORE_TELEPORT
+        PLAYERHOOK_ON_BEFORE_TELEPORT,
+        PLAYERHOOK_ON_MAP_CHANGED
     }) {}
+
+    void OnPlayerMapChanged(Player* player) override
+    {
+        if (!player || player->GetSession()->IsBot())
+            return;
+
+        PlayerbotMgr* playerbotMgr = GET_PLAYERBOT_MGR(player);
+        if (!playerbotMgr)
+            return;
+
+        for (PlayerBotMap::const_iterator it = playerbotMgr->GetPlayerBotsBegin(); it != playerbotMgr->GetPlayerBotsEnd(); ++it)
+        {
+            Player* bot = it->second;
+            if (!bot || !bot->IsInWorld() || bot->GetMapId() == player->GetMapId())
+                continue;
+
+            PlayerbotAI* botAI = GET_PLAYERBOT_AI(bot);
+            if (!botAI || botAI->HasStrategy("stay", BOT_STATE_NON_COMBAT))
+                continue;
+
+            if (!bot->IsInCombat())
+            {
+                bot->RemoveAurasWithInterruptFlags(AURA_INTERRUPT_FLAG_TELEPORTED | AURA_INTERRUPT_FLAG_CHANGE_MAP);
+                bot->TeleportTo(player->GetMapId(), player->GetPositionX(), player->GetPositionY(), player->GetPositionZ(), player->GetOrientation());
+            }
+        }
+
+        for (PlayerBotMap::const_iterator it = sRandomPlayerbotMgr.GetPlayerBotsBegin();
+             it != sRandomPlayerbotMgr.GetPlayerBotsEnd(); ++it)
+        {
+            Player* bot = it->second;
+            if (!bot || !bot->IsInWorld() || bot->GetMapId() == player->GetMapId())
+                continue;
+
+            PlayerbotAI* botAI = GET_PLAYERBOT_AI(bot);
+            if (!botAI || botAI->GetMaster() != player || botAI->HasStrategy("stay", BOT_STATE_NON_COMBAT))
+                continue;
+
+            if (!bot->IsInCombat())
+            {
+                bot->RemoveAurasWithInterruptFlags(AURA_INTERRUPT_FLAG_TELEPORTED | AURA_INTERRUPT_FLAG_CHANGE_MAP);
+                bot->TeleportTo(player->GetMapId(), player->GetPositionX(), player->GetPositionY(), player->GetPositionZ(), player->GetOrientation());
+            }
+        }
+    }
 
     void OnPlayerLogin(Player* player) override
     {
@@ -290,9 +335,9 @@ public:
                 if (!member || member == player)
                     continue;
 
-                if (GET_PLAYERBOT_AI(member))
+                if (PlayerbotAI* memberAI = GET_PLAYERBOT_AI(member))
                 {
-                    if (sPlayerbotAIConfig.randomBotEmote && !urand(0, 1))
+                    if (sPlayerbotAIConfig.randomBotEmote && memberAI->RollSocial(1))
                     {
                         member->SetFacingToObject(player);
                         member->HandleEmoteCommand(urand(0, 1) ? EMOTE_ONESHOT_CHEER : EMOTE_ONESHOT_APPLAUD);

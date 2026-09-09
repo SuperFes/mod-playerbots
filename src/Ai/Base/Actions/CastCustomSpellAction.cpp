@@ -9,6 +9,7 @@
 #include "ChatHelper.h"
 #include "Event.h"
 #include "ItemUsageValue.h"
+#include "LootObjectStack.h"
 #include "Playerbots.h"
 #include "ServerFacade.h"
 
@@ -129,6 +130,33 @@ bool CastCustomSpellAction::Execute(Event event)
         msg << "Unknown spell " << text;
         botAI->TellError(msg.str());
         return false;
+    }
+
+    if (spellInfo->HasEffect(SPELL_EFFECT_OPEN_LOCK) && !itemTarget && target == bot)
+    {
+        GuidVector const& gos = context->GetValue<GuidVector>("nearest game objects")->Get();
+        for (ObjectGuid const& goGuid : gos)
+        {
+            GameObject* go = botAI->GetGameObject(goGuid);
+            if (!go || !go->isSpawned())
+                continue;
+
+            if (botAI->CanCastSpell(spell, go))
+            {
+                context->GetValue<LootObject>("loot target")->Set(LootObject(bot, goGuid));
+                if (!bot->HasInArc(CAST_ANGLE_IN_FRONT, go, sPlayerbotAIConfig.sightDistance))
+                {
+                    ServerFacade::instance().SetFacingTo(bot, go);
+                    botAI->SetNextCheckDelay(sPlayerbotAIConfig.reactDelay);
+                }
+
+                std::ostringstream out;
+                out << "Casting " << ChatHelper::FormatSpell(spellInfo) << " on " << chat->FormatGameobject(go);
+                botAI->TellMasterNoFacing(out.str());
+
+                return botAI->CastSpell(spell, bot);
+            }
+        }
     }
 
     if (target != bot && !bot->HasInArc(CAST_ANGLE_IN_FRONT, target, sPlayerbotAIConfig.sightDistance))
@@ -311,7 +339,9 @@ bool CraftRandomItemAction::AcceptSpell(SpellInfo const* spellInfo)
 
 uint32 CraftRandomItemAction::GetSpellPriority(SpellInfo const* spellInfo)
 {
-    if (spellInfo->Effects[EFFECT_0].Effect != SPELL_EFFECT_CREATE_ITEM)
+    // AcceptSpell only lets SPELL_EFFECT_CREATE_ITEM through, so this test was inverted and the whole
+    // body was unreachable - every recipe scored 1 and the skill-up preference below never ran.
+    if (spellInfo->Effects[EFFECT_0].Effect == SPELL_EFFECT_CREATE_ITEM)
     {
         uint32 newItemId = spellInfo->Effects[EFFECT_0].ItemType;
         if (newItemId)
@@ -363,6 +393,25 @@ bool DisEnchantRandomItemAction::isUseful()
 {
     return botAI->HasSkill(SKILL_ENCHANTING) && !bot->IsInCombat() &&
            AI_VALUE2(uint32, "item count", "usage " + std::to_string(ITEM_USAGE_DISENCHANT)) > 0;
+}
+
+// CastRandomSpellAction::isUseful() is a hard false, so without this override the action could never
+// run from any path - including the RPG one, which routes through ExecuteAction and gets USELESS.
+bool CraftRandomItemAction::isUseful()
+{
+    if (bot->IsInCombat() || bot->isMoving() || bot->IsMounted())
+        return false;
+
+    static SkillType const craftingSkills[] = { SKILL_ALCHEMY,      SKILL_BLACKSMITHING, SKILL_ENCHANTING,
+                                                SKILL_ENGINEERING,  SKILL_INSCRIPTION,   SKILL_JEWELCRAFTING,
+                                                SKILL_LEATHERWORKING, SKILL_TAILORING,   SKILL_COOKING,
+                                                SKILL_FIRST_AID };
+
+    for (SkillType const skill : craftingSkills)
+        if (botAI->HasSkill(skill))
+            return true;
+
+    return false;
 }
 
 bool EnchantRandomItemAction::isUseful() { return botAI->HasSkill(SKILL_ENCHANTING) && !bot->IsInCombat(); }

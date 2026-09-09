@@ -14,6 +14,17 @@
 
 WorldLocation Formation::NullLocation = WorldLocation();
 
+// Personal space is this fraction of the follow distance, and the slow drift is this fraction of
+// that again. Both are bounded so Formation::GetMaxDistance() can state an honest tolerance - the
+// follow logic and the dismount gate both read it.
+static constexpr float FORMATION_SPREAD_FRACTION = 0.35f;
+static constexpr float FORMATION_DRIFT_FRACTION = 0.25f;
+static constexpr uint32 FORMATION_DRIFT_PERIOD_MIN = 7;
+static constexpr uint32 FORMATION_DRIFT_PERIOD_MAX = 15;
+
+// How much of a slot's angular width a bot may sit off-centre, so identical indices do not overlap.
+static constexpr float SLOT_BIAS_FRACTION = 0.35f;
+
 bool IsSameLocation(WorldLocation const& a, WorldLocation const& b)
 {
     return a.GetPositionX() == b.GetPositionX() && a.GetPositionY() == b.GetPositionY() &&
@@ -100,6 +111,24 @@ public:
     std::string const GetTargetName() override { return "line target"; }
 };
 
+// A bot's habitual place in the formation, expressed relative to the master's facing so "half a step
+// off the left flank" stays true as the master turns. Scaled by followDistance rather than
+// tooCloseDistance (a combat-spacing value) so it tracks the dial that actually sets party spread.
+// personalSpace is sampled on the unit disc, so |offset| never exceeds spread.
+void GetPersonalSpaceOffset(PlayerbotAI* botAI, Player* master, float driftX, float driftY,
+                            float& outX, float& outY)
+{
+    BotPersonality const& personality = botAI->GetPersonality();
+    float const spread = sPlayerbotAIConfig.followDistance * FORMATION_SPREAD_FRACTION;
+
+    float const localX = personality.personalSpaceX * spread + driftX;
+    float const localY = personality.personalSpaceY * spread + driftY;
+
+    float const orientation = master->GetOrientation();
+    outX = localX * std::cos(orientation) - localY * std::sin(orientation);
+    outY = localX * std::sin(orientation) + localY * std::cos(orientation);
+}
+
 class NearFormation : public MoveAheadFormation
 {
 public:
@@ -114,21 +143,30 @@ public:
 
         float range = sPlayerbotAIConfig.followDistance;
         float angle = GetFollowAngle();
-        float x = master->GetPositionX() + cos(angle) * range;
-        float y = master->GetPositionY() + sin(angle) * range;
+
+        float offsetX = 0.0f;
+        float offsetY = 0.0f;
+        GetPersonalSpaceOffset(botAI, master, 0.0f, 0.0f, offsetX, offsetY);
+
+        float x = master->GetPositionX() + cos(angle) * range + offsetX;
+        float y = master->GetPositionY() + sin(angle) * range + offsetY;
         float z = master->GetPositionZ() + master->GetHoverHeight();
         if (!map->CheckCollisionAndGetValidCoords(master, master->GetPositionX(), master->GetPositionY(),
                                                   master->GetPositionZ(), x, y, z))
         {
-            x = master->GetPositionX() + cos(angle) * range;
-            y = master->GetPositionY() + sin(angle) * range;
+            x = master->GetPositionX() + cos(angle) * range + offsetX;
+            y = master->GetPositionY() + sin(angle) * range + offsetY;
             z = master->GetPositionZ() + master->GetHoverHeight();
             master->UpdateAllowedPositionZ(x, y, z);
         }
         return WorldLocation(master->GetMapId(), x, y, z);
     }
 
-    float GetMaxDistance() override { return sPlayerbotAIConfig.followDistance; }
+    // Must cover the offset, or the bot would be judged out of position at its own standing spot.
+    float GetMaxDistance() override
+    {
+        return sPlayerbotAIConfig.followDistance * (1.0f + FORMATION_SPREAD_FRACTION);
+    }
 };
 
 class ChaosFormation : public MoveAheadFormation
@@ -146,15 +184,26 @@ public:
         float range = sPlayerbotAIConfig.followDistance;
         float angle = GetFollowAngle();
 
+        // Previously this re-rolled a +/- tooCloseDistance/2 offset every 3 seconds for every bot, which
+        // at the default follow distance was a larger jitter than the ring itself - bots snapped between
+        // grid cells rather than holding a position. Now the bulk of the offset is the bot's persistent
+        // standing spot and only a small remainder drifts, on a staggered period so the group does not
+        // shift on one beat.
         time_t now = time(nullptr);
-        if (!lastChangeTime || now - lastChangeTime >= 3)
+        if (!lastChangeTime || now - lastChangeTime >= static_cast<time_t>(driftPeriod))
         {
             lastChangeTime = now;
+            driftPeriod = urand(FORMATION_DRIFT_PERIOD_MIN, FORMATION_DRIFT_PERIOD_MAX);
 
-            dx = (urand(0, 10) / 10.0f - 0.5f) * sPlayerbotAIConfig.tooCloseDistance;
-            dy = (urand(0, 10) / 10.0f - 0.5f) * sPlayerbotAIConfig.tooCloseDistance;
-            dr = std::sqrt(dx * dx + dy * dy);
+            float const driftLimit =
+                sPlayerbotAIConfig.followDistance * FORMATION_SPREAD_FRACTION * FORMATION_DRIFT_FRACTION;
+
+            driftX = frand(-driftLimit, driftLimit);
+            driftY = frand(-driftLimit, driftLimit);
         }
+
+        GetPersonalSpaceOffset(botAI, master, driftX, driftY, dx, dy);
+        dr = std::sqrt(dx * dx + dy * dy);
 
         float x = master->GetPositionX() + std::cos(angle) * range + dx;
         float y = master->GetPositionY() + std::sin(angle) * range + dy;
@@ -178,6 +227,9 @@ public:
 
 private:
     time_t lastChangeTime;
+    uint32 driftPeriod = FORMATION_DRIFT_PERIOD_MIN;
+    float driftX = 0.f;
+    float driftY = 0.f;
     float dx = 0.f;
     float dy = 0.f;
     float dr = 0.f;
@@ -417,6 +469,27 @@ public:
     }
 };
 
+// Membership key for the slot cache: the ordered set of group member GUIDs plus the master. Alive
+// state and map are deliberately excluded - a death or a zone must not reshuffle everyone's slot.
+uint64 Formation::GetRosterKey(Player* master, Group* group) const
+{
+    uint64 key = master ? master->GetGUID().GetRawValue() : 0;
+
+    if (group)
+    {
+        for (GroupReference* ref = group->GetFirstMember(); ref; ref = ref->next())
+        {
+            if (Player* member = ref->GetSource())
+            {
+                // Order-independent mix so iteration order cannot invalidate the cache on its own.
+                key ^= member->GetGUID().GetRawValue() * 0x9E3779B97F4A7C15ull;
+            }
+        }
+    }
+
+    return key;
+}
+
 float Formation::GetFollowAngle()
 {
     Player* master = GetMaster();
@@ -426,6 +499,14 @@ float Formation::GetFollowAngle()
     // If there's no master and no group
     if (!master && !group)
         return 0.0f;
+
+    float const start = (master ? master->GetOrientation() : 0.0f);
+
+    // The slot only changes when membership does, so recompute on change and reuse otherwise. This is
+    // what stops the party swivelling every time someone dies, zones, or is resurrected.
+    uint64 const rosterKey = GetRosterKey(master, group);
+    if (_slotCacheValid && rosterKey == _cachedRosterKey)
+        return start + _cachedSlotOffset;
 
     uint32 index = 1;
     uint32 total = 1;
@@ -440,8 +521,9 @@ float Formation::GetFollowAngle()
         {
             Player* member = ref->GetSource();
 
-            // Skip invalid, dead, or out-of-map members
-            if (!member || !member->IsAlive() || bot->GetMapId() != member->GetMapId())
+            // Skip invalid members only. Dead and out-of-map members keep their slot: removing them
+            // renumbers everyone behind them and the whole formation rotates at once.
+            if (!member)
                 continue;
 
             // Skip the master
@@ -499,9 +581,22 @@ float Formation::GetFollowAngle()
         index = std::distance(roster.begin(), it) + 1;  // Find bot's index in the roster
     }
 
-    // Return
-    float start = (master ? master->GetOrientation() : 0.0f);
-    return start + (0.125f + 1.75f * index / total + (total == 2 ? 0.125f : 0.0f)) * M_PI;
+    float offset = (0.125f + 1.75f * index / total + (total == 2 ? 0.125f : 0.0f)) * M_PI;
+
+    // Nudge within the slot so two bots that resolve to the same index do not stand exactly on top of
+    // each other. Stable per bot, so it does not read as drift.
+    if (botAI)
+    {
+        float const slotWidth = static_cast<float>(M_PI) * 1.75f / static_cast<float>(std::max(total, 1u));
+        float const bias = (botAI->GetPersonality().slotBias % 1000u) / 1000.0f - 0.5f;
+        offset += bias * slotWidth * SLOT_BIAS_FRACTION;
+    }
+
+    _cachedRosterKey = rosterKey;
+    _cachedSlotOffset = offset;
+    _slotCacheValid = true;
+
+    return start + offset;
 }
 
 FormationValue::FormationValue(PlayerbotAI* botAI)

@@ -47,6 +47,8 @@
 #include "RBAC.h"
 #include "RandomPlayerbotMgr.h"
 #include "SayAction.h"
+#include "Group.h"
+#include "Spell.h"
 #include "ScriptMgr.h"
 #include "ServerFacade.h"
 #include "SharedDefines.h"
@@ -118,6 +120,9 @@ PlayerbotAI::PlayerbotAI()
       chatFilter(this),
       security(nullptr)
 {
+    lastPetAutocastCheck = 0;
+    lastPetGUID = ObjectGuid();
+
     for (uint8 i = 0; i < BOT_STATE_MAX; i++)
         engines[i] = nullptr;
 
@@ -136,11 +141,18 @@ PlayerbotAI::PlayerbotAI(Player* bot)
       chatFilter(this),
       security(bot)  // reorder args - whipowill
 {
+    lastPetAutocastCheck = 0;
+    lastPetGUID = ObjectGuid();
+
     if (!bot->isTaxiCheater() && HasCheat((BotCheatMask::taxi)))
         bot->SetTaxiCheater(true);
 
     // Implement a random start timer before their first action
     nextAICheckDelay = urand(500, 5000); // 0.5 to 5.0 seconds
+
+    // Seeded from the GUID so a character keeps the same traits across restarts.
+    _personality = BotPersonality::FromSeed(bot->GetGUID().GetCounter(), sPlayerbotAIConfig.personalityStrength);
+    _lastActiveTime = time(nullptr);
 
     for (uint8 i = 0; i < MAX_ACTIVITY_TYPE; i++)
     {
@@ -253,11 +265,18 @@ void PlayerbotAI::UpdateAI(uint32 elapsed, bool minimal)
         bot->GetSession()->isLogingOut() || bot->IsDuringRemoveFromWorld())
         return;
 
-    // If the bot gets attacked and is in combat, bypass any long non-combat delays
-    if (bot->IsInCombat() && nextAICheckDelay > sPlayerbotAIConfig.reactDelay)
+    // If the bot gets attacked, or is trailing behind a moving master, bypass any long non-combat delays
+    Player* currentMaster = GetMaster();
+    bool const followingMovingMaster = currentMaster && HasActivePlayerMaster() &&
+        (currentMaster->isMoving() || bot->GetDistance(currentMaster) > sPlayerbotAIConfig.followDistance);
+
+    if ((bot->IsInCombat() || followingMovingMaster) && nextAICheckDelay > sPlayerbotAIConfig.reactDelay)
     {
         nextAICheckDelay = sPlayerbotAIConfig.reactDelay;
     }
+
+    if (bot->IsInCombat() || bot->isMoving())
+        _lastActiveTime = time(nullptr);
 
     // Handle cheat options (set bot health and power if cheats are enabled)
     if (bot->IsAlive() &&
@@ -343,6 +362,24 @@ void PlayerbotAI::UpdateAI(uint32 elapsed, bool minimal)
 
                 // Interrupt if target ally has full health (heal by other member)
                 if (isHeal && isSingleTarget && spellTarget && spellTarget->IsFullHealth())
+                {
+                    InterruptSpell();
+                    YieldThread(bot, GetReactDelay());
+                    return;
+                }
+
+                // Interrupt if target is out of spell range
+                if (spellTarget && spellInfo->GetMaxRange(true) > 0.0f &&
+                    bot->GetDistance(spellTarget) > spellInfo->GetMaxRange(true) + 5.0f)
+                {
+                    InterruptSpell();
+                    YieldThread(bot, GetReactDelay());
+                    return;
+                }
+
+                // Interrupt non-combat cast if master is moving away
+                if (master && HasActivePlayerMaster() && master->isMoving() &&
+                    bot->GetDistance(master) > sPlayerbotAIConfig.farDistance && !bot->IsInCombat())
                 {
                     InterruptSpell();
                     YieldThread(bot, GetReactDelay());
@@ -556,6 +593,101 @@ void PlayerbotAI::UpdateAIInternal([[maybe_unused]] uint32 elapsed, bool minimal
     botOutgoingPacketHandlers.Handle(helper);
     masterIncomingPacketHandlers.Handle(helper);
     masterOutgoingPacketHandlers.Handle(helper);
+
+    // Check if any group member is taming a beast
+    Unit* tamingTarget = nullptr;
+    Group* group = bot->GetGroup();
+    if (group)
+    {
+        Group::MemberSlotList const& slots = group->GetMemberSlots();
+        for (Group::MemberSlotList::const_iterator slot = slots.begin(); slot != slots.end(); ++slot)
+        {
+            if (Player* member = ObjectAccessor::FindPlayer(slot->guid))
+            {
+                if (member->IsInWorld() && member->GetMapId() == bot->GetMapId())
+                {
+                    if (Spell* spell = member->GetCurrentSpell(CURRENT_CHANNELED_SPELL))
+                    {
+                        if (spell->GetSpellInfo()->Id == 1515)
+                        {
+                            tamingTarget = spell->m_targets.GetUnitTarget();
+                            if (tamingTarget)
+                                break;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    else
+    {
+        // Solo check: check if the bot itself is taming
+        if (Spell* spell = bot->GetCurrentSpell(CURRENT_CHANNELED_SPELL))
+        {
+            if (spell->GetSpellInfo()->Id == 1515)
+                tamingTarget = spell->m_targets.GetUnitTarget();
+        }
+    }
+
+    if (tamingTarget)
+    {
+        // If a party member is taming, make sure our pet/controlled units are set to passive and stop attacking
+        Pet* pet = bot->GetPet();
+        if (pet && pet->IsAlive())
+        {
+            if (pet->GetVictim() == tamingTarget)
+            {
+                pet->AttackStop();
+                pet->SetReactState(REACT_PASSIVE);
+                if (CharmInfo* charmInfo = pet->GetCharmInfo())
+                {
+                    charmInfo->SetCommandState(COMMAND_FOLLOW);
+                    charmInfo->SetPlayerReactState(REACT_PASSIVE);
+                    charmInfo->SetIsCommandAttack(false);
+                    charmInfo->SetIsCommandFollow(true);
+                    charmInfo->SetIsFollowing(true);
+                }
+            }
+        }
+
+        for (Unit::ControlSet::const_iterator itr = bot->m_Controlled.begin(); itr != bot->m_Controlled.end(); ++itr)
+        {
+            Creature* creature = dynamic_cast<Creature*>(*itr);
+            if (creature && creature->IsAlive() && !creature->IsTotem())
+            {
+                if (creature->GetVictim() == tamingTarget)
+                {
+                    creature->AttackStop();
+                    creature->SetReactState(REACT_PASSIVE);
+                    if (CharmInfo* charmInfo = creature->GetCharmInfo())
+                    {
+                        charmInfo->SetCommandState(COMMAND_FOLLOW);
+                        charmInfo->SetPlayerReactState(REACT_PASSIVE);
+                        charmInfo->SetIsCommandAttack(false);
+                        charmInfo->SetIsCommandFollow(true);
+                        charmInfo->SetIsFollowing(true);
+                    }
+                }
+            }
+        }
+    }
+
+    // Periodically verify pet spell autocast configurations (every 10 seconds, or immediately upon new pet summon)
+    if (bot->GetPet())
+    {
+        ObjectGuid petGuid = bot->GetPetGUID();
+        time_t now = time(nullptr);
+        if (petGuid != lastPetGUID || now - lastPetAutocastCheck >= 10)
+        {
+            lastPetGUID = petGuid;
+            lastPetAutocastCheck = now;
+            DoSpecificAction("toggle pet spell", Event(), true);
+        }
+    }
+    else
+    {
+        lastPetGUID = ObjectGuid();
+    }
 
     DoNextAction(minimal);
 
@@ -3711,9 +3843,6 @@ bool PlayerbotAI::CastSpell(uint32 spellId, Unit* target, Item* itemTarget)
         GameObject* go = GetGameObject(loot.guid);
         if (go && go->isSpawned())
         {
-            WorldPacket packetgouse(CMSG_GAMEOBJ_USE, 8);
-            packetgouse << loot.guid;
-            bot->GetSession()->HandleGameObjectUseOpcode(packetgouse);
             targets.SetGOTarget(go);
             faceTo = go;
         }
@@ -4489,6 +4618,28 @@ bool PlayerbotAI::HasRealPlayerMaster()
 }
 
 bool PlayerbotAI::HasActivePlayerMaster() { return master && !GET_PLAYERBOT_AI(master); }
+
+// Inside this radius the bot counts as being "with" the master and may stop for upkeep.
+// Matches FarFromMasterTrigger's default distance so the two decisions agree.
+constexpr float UPKEEP_MASTER_RADIUS = 12.0f;
+
+// True while the bot is trailing a real player master who is on the move, or who stopped
+// further away than the follow trigger reaches. Bots run at exactly the master's speed
+// (the +10% catch-up in MovementActions.cpp is commented out), so any action that sits the
+// bot down costs distance it can never recover.
+bool PlayerbotAI::IsTravellingWithMaster()
+{
+    if (!master || !HasActivePlayerMaster() || !master->IsInWorld())
+        return false;
+
+    if (bot->GetMapId() != master->GetMapId())
+        return false;
+
+    if (master->isMoving())
+        return true;
+
+    return bot->GetDistance(master) > UPKEEP_MASTER_RADIUS;
+}
 
 bool PlayerbotAI::IsAlt() { return HasRealPlayerMaster() && !sRandomPlayerbotMgr.IsRandomBot(bot); }
 
@@ -6621,9 +6772,66 @@ std::set<uint32> PlayerbotAI::GetCurrentIncompleteQuestIds()
     return result;
 }
 
+uint32 PlayerbotAI::GetIdleSeconds() const
+{
+    time_t const now = time(nullptr);
+    return (_lastActiveTime && now > _lastActiveTime) ? static_cast<uint32>(now - _lastActiveTime) : 0;
+}
+
+// Call sites historically wrote `!urand(0, N)`, i.e. one chance in N+1. Preserved exactly at a
+// socialScale of 1, so a bot with the default trait behaves as before.
+bool PlayerbotAI::RollSocial(uint32 oneInN) const
+{
+    float const chance = _personality.socialScale / static_cast<float>(oneInN + 1);
+    return frand(0.0f, 1.0f) < chance;
+}
+
+// Seconds until a bot may repeat a social action. Chatty bots come off cooldown sooner; the per-bot
+// stagger stops a group that acted together from becoming eligible together.
+uint32 PlayerbotAI::SocialCooldown(uint32 minSeconds, uint32 maxSeconds) const
+{
+    float const base = urand(minSeconds, maxSeconds) * sPlayerbotAIConfig.socialCooldownScale;
+    float const scaled = base / std::max(0.05f, _personality.socialScale);
+
+    uint32 const spread = std::max(1u, (maxSeconds - minSeconds) / 2 + 1);
+    uint32 const stagger = bot->GetGUID().GetCounter() % spread;
+
+    return static_cast<uint32>(scaled) + stagger;
+}
+
+// Applies this bot's reaction trait to a delay, re-rolled per decision so a slow bot is reliably
+// slow without being metronomic. Only ever called on discretionary paths - urgent ones return the
+// raw config value. Note PlayerbotAI::UpdateAI clamps nextAICheckDelay back to the raw reactDelay
+// whenever the bot is in combat, so this can never blunt a combat response.
+uint32 PlayerbotAI::PersonaliseDelay(uint32 delay) const
+{
+    float const scaled = BotPersonality::ApplyJitter(static_cast<float>(delay) * _personality.reactionScale,
+                                                     BotPersonality::REACTION_JITTER, frand(0.0f, 1.0f));
+
+    return std::max<uint32>(MIN_PERSONALISED_DELAY_MS, static_cast<uint32>(scaled));
+}
+
 uint32 PlayerbotAI::GetReactDelay()
 {
     uint32 base = sPlayerbotAIConfig.reactDelay;  // Default 100(ms)
+
+    // If the bot is casting or channeling a spell, react quickly to check when the cast finishes
+    if (bot->IsNonMeleeSpellCast(true))
+        return base;
+
+    // Flying bots must update rapidly to track the master at flight speed (~18 m/s).
+    // Any of the slow random delays below would cause them to fall hundreds of meters
+    // behind before a follow tick fires. Apply the fast path for both taxi flight
+    // (UNIT_STATE_IN_FLIGHT) and flying mounts.
+    if (bot->IsFlying() || bot->HasUnitState(UNIT_STATE_IN_FLIGHT))
+        return base;
+
+    // If the bot's master is on a flight path, match their urgency
+    if (Player* master = GetMaster())
+    {
+        if (master->IsFlying() || master->HasUnitState(UNIT_STATE_IN_FLIGHT))
+            return base;
+    }
 
     // If dynamic react delay is disabled, use a static calculation
     if (!sPlayerbotAIConfig.dynamicReactDelay)
@@ -6639,18 +6847,19 @@ uint32 PlayerbotAI::GetReactDelay()
         bool inCombat = bot->IsInCombat();
 
         if (!inCombat)
-            return base * 10;
+            return PersonaliseDelay(base * 10);
 
         else if (inCombat)
-            return static_cast<uint32>(base * 2.0f);
+            return PersonaliseDelay(static_cast<uint32>(base * 2.0f));
 
         return base;
     }
 
     // Dynamic react delay calculation:
 
+    // The flat return here is why a party of bots reacts on one frame; the trait breaks that up.
     if (HasRealPlayerMaster())
-        return base;
+        return PersonaliseDelay(base);
 
     bool inBG = bot->InBattleground() || bot->InArena();
 
@@ -6658,23 +6867,24 @@ uint32 PlayerbotAI::GetReactDelay()
     {
         if (bot->IsInCombat() || currentState == BOT_STATE_COMBAT)
         {
-            return static_cast<uint32>(base * (sPlayerbotAIConfig.fastReactInBG ? 2.5f : 5.0f));
+            return PersonaliseDelay(static_cast<uint32>(base * (sPlayerbotAIConfig.fastReactInBG ? 2.5f : 5.0f)));
         }
         else
         {
-            return static_cast<uint32>(base * (sPlayerbotAIConfig.fastReactInBG ? 1.0f : 10.0f));
+            return PersonaliseDelay(static_cast<uint32>(base * (sPlayerbotAIConfig.fastReactInBG ? 1.0f : 10.0f)));
         }
     }
 
     // When in combat, return 2 times the base (200ms default) for snappier dungeon reactions
     if (bot->IsInCombat() || currentState == BOT_STATE_COMBAT)
-        return base * 2;
+        return PersonaliseDelay(base * 2);
 
     // When not resting, return 10-30 times the base
     if (!bot->HasFlag(PLAYER_FLAGS, PLAYER_FLAGS_RESTING))
-        return base * urand(10, 30);
+        return PersonaliseDelay(base * urand(10, 30));
 
-    // In other cases, return 20-200 times the base
+    // Resting bots idle for up to 20s already. Personalising that would stretch the tail past 40s for
+    // no visible gain - nobody watches an AFK bot's tick rate - so this path stays as it was.
     return base * urand(20, 200);
 }
 

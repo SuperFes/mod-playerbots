@@ -40,6 +40,7 @@ public:
         creators["timer bg"] = &TriggerContext::TimerBG;
         creators["random"] = &TriggerContext::Random;
         creators["seldom"] = &TriggerContext::seldom;
+        creators["sometimes"] = &TriggerContext::sometimes;
         creators["often"] = &TriggerContext::often;
         creators["very often"] = &TriggerContext::very_often;
 
@@ -86,6 +87,7 @@ public:
         creators["no target"] = &TriggerContext::NoTarget;
         creators["target in sight"] = &TriggerContext::TargetInSight;
         creators["not dps target active"] = &TriggerContext::not_dps_target_active;
+        creators["bot idle"] = &TriggerContext::bot_idle;
         creators["not dps aoe target active"] = &TriggerContext::not_dps_aoe_target_active;
         creators["has nearest adds"] = &TriggerContext::has_nearest_adds;
         creators["enemy player near"] = &TriggerContext::enemy_player_near;
@@ -341,6 +343,10 @@ private:
     static Trigger* enemy_player_near(PlayerbotAI* botAI) { return new EnemyPlayerNear(botAI); }
     static Trigger* Random(PlayerbotAI* botAI) { return new RandomTrigger(botAI, "random", 20); }
     static Trigger* seldom(PlayerbotAI* botAI) { return new RandomTrigger(botAI, "seldom", 300); }
+    // Between "random" and "seldom". Social actions carry their own cooldown, so their trigger only
+    // has to fire often enough not to become the real pacing - the cooldown should own that.
+    static Trigger* sometimes(PlayerbotAI* botAI) { return new RandomTrigger(botAI, "sometimes", 30); }
+    static Trigger* bot_idle(PlayerbotAI* botAI) { return new BotIdleTrigger(botAI); }
     static Trigger* often(PlayerbotAI* botAI) { return new RandomTrigger(botAI, "often", 5); }
     static Trigger* very_often(PlayerbotAI* botAI) { return new RandomTrigger(botAI, "often", 3); }
     static Trigger* EnemyOutOfMelee(PlayerbotAI* botAI) { return new EnemyOutOfMeleeTrigger(botAI); }

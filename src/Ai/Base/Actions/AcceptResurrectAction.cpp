@@ -24,7 +24,7 @@ bool AcceptResurrectAction::Execute(Event event)
     packet << uint8(1);                                        // accept
     bot->GetSession()->HandleResurrectResponseOpcode(packet);  // queue the packet to get around race condition
 
-    if (sPlayerbotAIConfig.randomBotEmote && !urand(0, 1))
+    if (sPlayerbotAIConfig.randomBotEmote && botAI->RollSocial(1))
         bot->HandleEmoteCommand(EMOTE_ONESHOT_KNEEL);
 
     return true;

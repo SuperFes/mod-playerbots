@@ -8,6 +8,11 @@
 
 #include "Event.h"
 #include "Playerbots.h"
+
+// Was urand(60, 240) plus up to 120s of jitter - 1 to 6 minutes per bot on top of the `seldom`
+// trigger's own ~10 minute expectation, which is why bots went quiet.
+static constexpr uint32 EMOTE_COOLDOWN_MIN = 30;
+static constexpr uint32 EMOTE_COOLDOWN_MAX = 120;
 #include "ServerFacade.h"
 
 std::map<std::string, uint32> EmoteActionBase::emotes;
@@ -41,7 +46,6 @@ void EmoteActionBase::InitEmotes()
     emotes["cheer"] = EMOTE_ONESHOT_CHEER;
     emotes["chicken"] = EMOTE_ONESHOT_CHICKEN;
     emotes["cry"] = EMOTE_ONESHOT_CRY;
-    emotes["dance"] = EMOTE_STATE_DANCE;
     emotes["eat"] = EMOTE_ONESHOT_EAT;
     emotes["exclamation"] = EMOTE_ONESHOT_EXCLAMATION;
     emotes["flex"] = EMOTE_ONESHOT_FLEX;
@@ -734,10 +738,9 @@ bool EmoteAction::Execute(Event event)
     std::string param = event.getParam();
     if ((!isReact && param.empty()) || emote)
     {
-        uint32 guidJitter = (bot->GetGUID().GetCounter() % 120);
         botAI->GetAiObjectContext()
             ->GetValue<time_t>("last emote", qualifier)
-            ->Set(time(nullptr) + urand(60, 240) + guidJitter);
+            ->Set(time(nullptr) + botAI->SocialCooldown(EMOTE_COOLDOWN_MIN, EMOTE_COOLDOWN_MAX));
         param = qualifier;
     }
 
@@ -817,8 +820,8 @@ bool TalkAction::Execute(Event /*event*/)
 
         context->GetValue<ObjectGuid>("talk target")->Set(target->GetGUID());
 
-        uint32 guidJitter = (bot->GetGUID().GetCounter() % 120);
-        botAI->GetAiObjectContext()->GetValue<time_t>("last emote", "talk")->Set(time(nullptr) + urand(60, 240) + guidJitter);
+        botAI->GetAiObjectContext()->GetValue<time_t>("last emote", "talk")
+            ->Set(time(nullptr) + botAI->SocialCooldown(EMOTE_COOLDOWN_MIN, EMOTE_COOLDOWN_MAX));
 
         bool textEmote = (urand(0, 9) == 0);
         return Emote(target, GetRandomEmote(target, textEmote), textEmote);

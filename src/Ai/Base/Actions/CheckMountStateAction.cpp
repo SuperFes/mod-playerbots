@@ -5,12 +5,16 @@
  */
 
 #include "CheckMountStateAction.h"
+
+#include <algorithm>
+
 #include "AreaDefines.h"
 #include "BattleGroundTactics.h"
 #include "BattlegroundEY.h"
 #include "BattlegroundWS.h"
 #include "DBCStores.h"
 #include "Event.h"
+#include "Formations.h"
 #include "PlayerbotAI.h"
 #include "PlayerbotAIConfig.h"
 #include "Playerbots.h"
@@ -428,27 +432,33 @@ bool CheckMountStateAction::TryPreferredMount(Player* master) const
 
 bool CheckMountStateAction::TryRandomMountFiltered(const std::map<int32, std::vector<uint32>>& spells, int32 masterSpeed) const
 {
-    for (auto it = spells.rbegin(); it != spells.rend(); ++it)
+    // Pass 0 takes only mounts that keep up with the master. Pass 1 drops that requirement:
+    // a slower mount still beats staying on foot, which is what returning false here means.
+    for (uint8 pass = 0; pass < 2; ++pass)
     {
-        int32 currentSpeed = it->first;
-
-        if ((masterSpeed > 59 && currentSpeed < 99) || (masterSpeed > 149 && currentSpeed < 279))
-            continue;
-
-        // Pick a random mount from the candidate group.
-        auto const& ids = it->second;
-        if (!ids.empty())
+        for (auto it = spells.rbegin(); it != spells.rend(); ++it)
         {
-            // Required here as otherwise bots won't mount in BGs due to them constant moving
-            if (bot->isMoving())
-                bot->StopMoving();
+            int32 currentSpeed = it->first;
 
-            uint32 index = urand(0, ids.size() - 1);
+            if (pass == 0 &&
+                ((masterSpeed > 59 && currentSpeed < 99) || (masterSpeed > 149 && currentSpeed < 279)))
+                continue;
 
-            if (botAI->CanCastSpell(ids[index], bot))
+            // Pick a random mount from the candidate group.
+            auto const& ids = it->second;
+            if (!ids.empty())
             {
-                botAI->CastSpell(ids[index], bot);
-                return true;
+                // Required here as otherwise bots won't mount in BGs due to them constant moving
+                if (bot->isMoving())
+                    bot->StopMoving();
+
+                uint32 index = urand(0, ids.size() - 1);
+
+                if (botAI->CanCastSpell(ids[index], bot))
+                {
+                    botAI->CastSpell(ids[index], bot);
+                    return true;
+                }
             }
         }
     }
@@ -491,7 +501,44 @@ bool CheckMountStateAction::ShouldDismountForMaster(Player* master) const
     bool isMasterMounted = master->IsMounted() || (masterInShapeshiftForm == FORM_FLIGHT ||
                                                    masterInShapeshiftForm == FORM_FLIGHT_EPIC ||
                                                    masterInShapeshiftForm == FORM_TRAVEL);
-    return !isMasterMounted && bot->IsMounted();
+    if (isMasterMounted || !bot->IsMounted())
+        return false;
+
+    // The master dismounted, but the bot may still be a long way behind. Riding the rest of the
+    // way in is what a player would do, so stay mounted until we have arrived.
+    if (bot->GetMapId() != master->GetMapId())
+        return true;
+
+    return IsInFollowPosition(master);
+}
+
+// "Have I arrived?" measured exactly the way FollowAction::isUseful() measures it, so dismounting
+// and finishing the follow agree on one definition of being in position.
+bool CheckMountStateAction::IsInFollowPosition(Player* master) const
+{
+    // Each bot has its own idea of "close enough", so a group stops riding one at a time.
+    float const factor = sPlayerbotAIConfig.dismountFollowFactor *
+        BotPersonality::ApplyJitter(botAI->GetPersonality().dismountSlack,
+                                    BotPersonality::DISMOUNT_JITTER, frand(0.0f, 1.0f));
+
+    Formation* formation = AI_VALUE(Formation*, "formation");
+    if (!formation)
+        return bot->GetExactDist2d(master) <= sPlayerbotAIConfig.followDistance * factor;
+
+    float const tolerance = formation->GetMaxDistance() * factor;
+
+    std::string const target = formation->GetTargetName();
+    if (!target.empty())
+    {
+        Unit* followTarget = AI_VALUE(Unit*, target);
+        return followTarget && bot->GetExactDist2d(followTarget) <= tolerance;
+    }
+
+    WorldLocation loc = formation->GetLocation();
+    if (Formation::IsNullLocation(loc) || loc.GetMapId() != bot->GetMapId())
+        return true;  // no resolvable slot - dismount rather than stay mounted forever
+
+    return bot->GetExactDist2d(loc.GetPositionX(), loc.GetPositionY()) <= tolerance;
 }
 
 static bool BotCanUseFlyingMount(Player const* bot)

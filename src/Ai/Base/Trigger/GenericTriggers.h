@@ -705,6 +705,16 @@ public:
     bool IsActive() override;
 };
 
+// True once the bot has been standing around out of combat for a while - the gap while the group
+// waits on a spawn or a summon.
+class BotIdleTrigger : public Trigger
+{
+public:
+    BotIdleTrigger(PlayerbotAI* botAI) : Trigger(botAI, "bot idle", 5) {}
+
+    bool IsActive() override;
+};
+
 class NotDpsTargetActiveTrigger : public Trigger
 {
 public:

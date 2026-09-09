@@ -105,6 +105,10 @@ public:
     float sightDistance, spellDistance, reactDistance, grindDistance, lootDistance, shootDistance, fleeDistance,
         tooCloseDistance, meleeDistance, followDistance, whisperDistance, contactDistance, aoeRadius, rpgDistance,
         targetPosRecalcDistance, farDistance, healDistance, aggroDistance;
+    float dismountFollowFactor;
+    float personalityStrength;
+    float socialCooldownScale;
+    uint32 tradeskillIdleSeconds;
     uint32 criticalHealth, lowHealth, mediumHealth, almostFullHealth;
     uint32 lowMana, mediumMana, highMana;
     bool autoSaveMana;
@@ -184,6 +188,8 @@ public:
     uint32 broadcastToGeneralGlobalChance;
     uint32 broadcastToTradeGlobalChance;
     uint32 broadcastToLFGGlobalChance;
+    uint32 broadcastToPartyGlobalChance;
+    uint32 broadcastToSayGlobalChance;
     uint32 broadcastToLocalDefenseGlobalChance;
     uint32 broadcastToWorldDefenseGlobalChance;
     uint32 broadcastToGuildRecruitmentGlobalChance;

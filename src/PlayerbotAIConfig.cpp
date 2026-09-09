@@ -5,6 +5,9 @@
  */
 
 #include "PlayerbotAIConfig.h"
+#include <algorithm>
+
+#include "BotPersonality.h"
 #include <iostream>
 #include "BisListMgr.h"
 #include "Config.h"
@@ -105,6 +108,18 @@ bool PlayerbotAIConfig::Initialize()
     rpgDistance = sConfigMgr->GetOption<float>("AiPlayerbot.RpgDistance", 200.0f);
     grindDistance = sConfigMgr->GetOption<float>("AiPlayerbot.GrindDistance", 75.0f);
     reactDistance = sConfigMgr->GetOption<float>("AiPlayerbot.ReactDistance", 150.0f);
+
+    // A factor below 1 would leave bots mounted at their parked follow position forever.
+    dismountFollowFactor =
+        std::max(1.0f, sConfigMgr->GetOption<float>("AiPlayerbot.DismountFollowDistanceFactor", 1.25f));
+
+    personalityStrength = std::clamp(
+        sConfigMgr->GetOption<float>("AiPlayerbot.PersonalityStrength", 1.0f), 0.0f, BotPersonality::STRENGTH_MAX);
+
+    socialCooldownScale =
+        std::max(0.05f, sConfigMgr->GetOption<float>("AiPlayerbot.SocialCooldownScale", 1.0f));
+
+    tradeskillIdleSeconds = sConfigMgr->GetOption<uint32>("AiPlayerbot.TradeskillIdleSeconds", 30);
 
     criticalHealth = sConfigMgr->GetOption<int32>("AiPlayerbot.CriticalHealth", 25);
     lowHealth = sConfigMgr->GetOption<int32>("AiPlayerbot.LowHealth", 45);
@@ -291,6 +306,8 @@ bool PlayerbotAIConfig::Initialize()
     broadcastToGeneralGlobalChance = sConfigMgr->GetOption<int32>("AiPlayerbot.BroadcastToGeneralGlobalChance", 30000);
     broadcastToTradeGlobalChance = sConfigMgr->GetOption<int32>("AiPlayerbot.BroadcastToTradeGlobalChance", 30000);
     broadcastToLFGGlobalChance = sConfigMgr->GetOption<int32>("AiPlayerbot.BroadcastToLFGGlobalChance", 30000);
+    broadcastToPartyGlobalChance = sConfigMgr->GetOption<int32>("AiPlayerbot.BroadcastToPartyGlobalChance", 30000);
+    broadcastToSayGlobalChance = sConfigMgr->GetOption<int32>("AiPlayerbot.BroadcastToSayGlobalChance", 30000);
     broadcastToLocalDefenseGlobalChance =
         sConfigMgr->GetOption<int32>("AiPlayerbot.BroadcastToLocalDefenseGlobalChance", 30000);
     broadcastToWorldDefenseGlobalChance =

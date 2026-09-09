@@ -170,7 +170,10 @@ void EquipAction::EquipItem(Item* item)
             if (canTitanGrip && isTwoHander && isValidTGWeapon)
                 canTGOff = true;
 
-            bool canGoOff = (invType == INVTYPE_WEAPON ||
+            // A two-hander occupies the offhand slot even though it reads as empty, so nothing may be
+            // routed there while one is equipped. IsTwoHandUsed() already excludes Titan Grip.
+            bool canGoOff = !bot->IsTwoHandUsed() &&
+                            (invType == INVTYPE_WEAPON ||
                              invType == INVTYPE_WEAPONOFFHAND ||
                              canTGOff);
 

@@ -21,6 +21,11 @@
 
 namespace
 {
+    // A lift is boardable only while its deck is roughly level with the bot, and only from close by:
+    // boarding moves in a straight line with no pathfinding, so a large gap must never be attempted.
+    constexpr float STATIC_TRANSPORT_BOARD_Z_TOLERANCE = 3.0f;
+    constexpr float STATIC_TRANSPORT_BOARD_RANGE = 20.0f;
+
     Transport* GetTransportForPosTolerant(Map* map, WorldObject* ref, uint32 phaseMask, float x, float y, float z)
     {
         if (!map || !ref)
@@ -123,8 +128,14 @@ bool FollowAction::Execute(Event /*event*/)
             masterOnTransport = (transport != nullptr);
         }
 
-        // Ignore static transports (elevators/trams): only keep boats/zeppelins here.
-        if (transport && transport->IsStaticTransport())
+        // Static transports (elevators/lifts) board by the same straight-line step as boats, which is
+        // only safe across a small vertical gap. A platform level with us - a lift waiting at the
+        // bottom - qualifies; one halfway up its shaft does not, and walking at it would send the bot
+        // into the shaft wall. Judge by the master's height rather than the transport's, because a
+        // static transport's own position is its base, not its deck.
+        bool const staticTransport = transport && transport->IsStaticTransport();
+        if (staticTransport &&
+            std::fabs(master->GetPositionZ() - bot->GetPositionZ()) > STATIC_TRANSPORT_BOARD_Z_TOLERANCE)
             transport = nullptr;
 
         if (transport && map && bot->GetTransport() != transport)
@@ -140,7 +151,7 @@ bool FollowAction::Execute(Event /*event*/)
                 return true;
             }
 
-            float const boardingAssistDistance = 60.0f;
+            float const boardingAssistDistance = staticTransport ? STATIC_TRANSPORT_BOARD_RANGE : 60.0f;
             float const dist2d = ServerFacade::instance().GetDistance2d(bot, master);
             bool const inAssist = ServerFacade::instance().IsDistanceLessOrEqualThan(dist2d, boardingAssistDistance);
 
@@ -170,7 +181,7 @@ bool FollowAction::Execute(Event /*event*/)
 
                 bool const movingAllowed = IsMovingAllowed();
                 bool const dupMove = IsDuplicateMove(destX, destY, destZ);
-                bool const waiting = IsWaitingForLastMove(priority);
+                bool const waiting = IsWaitingForLastMove(priority, destX, destY, destZ);
 
                 if (movingAllowed && !dupMove && !waiting)
                 {
@@ -209,6 +220,9 @@ bool FollowAction::Execute(Event /*event*/)
         }
     }
     // end unified transport handling
+
+    if (bot->IsSitState())
+        bot->SetStandState(UNIT_STAND_STATE_STAND);
 
     bool moved = false;
     if (!target.empty())

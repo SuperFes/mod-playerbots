@@ -164,6 +164,17 @@ bool BuffTrigger::IsActive()
     if (!target)
         return false;
 
+    uint32 const spellId = botAI->GetAiObjectContext()->GetValue<uint32>("spell id", spell)->Get();
+    if (spellId)
+    {
+        if (SpellInfo const* spellInfo = sSpellMgr->GetSpellInfo(spellId))
+        {
+            float maxRange = bot->GetSpellMaxRangeForTarget(target, spellInfo);
+            if (bot->GetDistance(target) > maxRange)
+                return false;
+        }
+    }
+
     Aura* aura = botAI->GetAura(spell, target, checkIsOwner, checkDuration);
     if (!aura || (beforeDuration && uint32(aura->GetDuration()) < beforeDuration))
         return true;
@@ -593,6 +604,14 @@ bool NoPossibleTargetsTrigger::IsActive()
 bool PossibleAddsTrigger::IsActive()
 {
     return AI_VALUE(bool, "possible adds") && !AI_VALUE(ObjectGuid, "pull target");
+}
+
+bool BotIdleTrigger::IsActive()
+{
+    if (bot->IsInCombat() || botAI->GetState() == BOT_STATE_COMBAT || bot->isMoving())
+        return false;
+
+    return botAI->GetIdleSeconds() >= sPlayerbotAIConfig.tradeskillIdleSeconds;
 }
 
 bool NotDpsTargetActiveTrigger::IsActive()
