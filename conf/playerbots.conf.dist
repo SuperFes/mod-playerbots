@@ -480,8 +480,9 @@ AiPlayerbot.BotTransmog = 1
 AiPlayerbot.UtilityCallouts = 1
 
 # Bots occasionally remark on where they are, in local /say rather than a channel, so only people
-# standing nearby hear it. Capital cities only for now: the weather lines in the text pool are not
-# tagged by actual weather state, so emitting them would mean commenting on rain in the sunshine.
+# standing nearby hear it: the city they are standing in, or the weather actually falling on them.
+# Weather lines are matched to the real weather state, so bots do not complain about rain in the
+# sunshine, and zones with no weather data are simply skipped.
 AiPlayerbot.AmbientSay = 1
 
 # Bots sell junk when the group is stopped next to a vendor. They never walk to one - this only

@@ -16,6 +16,7 @@
 #include "AmbitionMgr.h"
 #include "DBCStores.h"
 #include "SpellMgr.h"
+#include "Weather.h"
 
 // Was urand(300, 600) plus up to 300s of jitter - 5 to 15 minutes per bot, which read as silence.
 // PlayerbotAI::SocialCooldown scales these by the bot's chattiness and AiPlayerbot.SocialCooldownScale.
@@ -589,6 +590,37 @@ namespace
         AreaTableEntry const* zone = sAreaTableStore.LookupEntry(bot->GetZoneId());
         return zone && (zone->flags & AREA_FLAG_CAPITAL);
     }
+
+    // Text pool for the weather actually happening, not weather in general. Commenting on rain
+    // during clear skies is worse than saying nothing, which is why these are tagged by state.
+    char const* WeatherTextKey(WeatherState state)
+    {
+        switch (state)
+        {
+            case WEATHER_STATE_FINE:
+                return "weather_fine";
+            case WEATHER_STATE_FOG:
+                return "weather_fog";
+            case WEATHER_STATE_LIGHT_RAIN:
+            case WEATHER_STATE_MEDIUM_RAIN:
+            case WEATHER_STATE_HEAVY_RAIN:
+            case WEATHER_STATE_BLACKRAIN:
+                return "weather_rain";
+            case WEATHER_STATE_LIGHT_SNOW:
+            case WEATHER_STATE_MEDIUM_SNOW:
+            case WEATHER_STATE_HEAVY_SNOW:
+            case WEATHER_STATE_BLACKSNOW:
+                return "weather_snow";
+            case WEATHER_STATE_LIGHT_SANDSTORM:
+            case WEATHER_STATE_MEDIUM_SANDSTORM:
+            case WEATHER_STATE_HEAVY_SANDSTORM:
+                return "weather_sandstorm";
+            case WEATHER_STATE_THUNDERS:
+                return "weather_storm";
+            default:
+                return "weather_rough";
+        }
+    }
 }
 
 bool AmbientSayAction::isUseful()
@@ -599,7 +631,8 @@ bool AmbientSayAction::isUseful()
     if (bot->IsInCombat() || botAI->GetState() == BOT_STATE_COMBAT)
         return false;
 
-    if (!IsInCapitalCity(bot))
+    // Either somewhere worth remarking on, or weather worth remarking on.
+    if (!IsInCapitalCity(bot) && !bot->IsOutdoors())
         return false;
 
     return time(nullptr) >= AI_VALUE2(time_t, "last said", getName());
@@ -616,8 +649,32 @@ bool AmbientSayAction::Execute(Event /*event*/)
     placeholders["%zone_name"] = botAI->GetLocalizedAreaName(zone);
     placeholders["%area_name"] = area ? botAI->GetLocalizedAreaName(area) : placeholders["%zone_name"];
 
-    std::string const line =
-        PlayerbotTextMgr::instance().GetBotTextOrDefault("broadcast_city_arrival", "", placeholders);
+    std::string key;
+
+    if (IsInCapitalCity(bot))
+    {
+        key = "broadcast_city_arrival";
+    }
+    else if (bot->IsOutdoors())
+    {
+        // Returns null for zones with no weather data at all, which is most instances.
+        Weather* weather = bot->GetMap()->GetOrGenerateZoneDefaultWeather(bot->GetZoneId());
+        if (!weather)
+            return false;
+
+        WeatherState const state = weather->GetWeatherState();
+
+        // Bad weather can draw either a specific remark or a general grumble; clear skies only get
+        // the fine lines, since "weather sucks today" in sunshine is exactly the problem to avoid.
+        key = WeatherTextKey(state);
+        if (state != WEATHER_STATE_FINE && botAI->RollSocial(2))
+            key = "weather_rough";
+    }
+
+    if (key.empty())
+        return false;
+
+    std::string const line = PlayerbotTextMgr::instance().GetBotTextOrDefault(key, "", placeholders);
 
     if (line.empty())
         return false;
