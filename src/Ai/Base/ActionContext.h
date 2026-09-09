@@ -144,6 +144,8 @@ public:
         creators["emote"] = &ActionContext::emote;
         creators["talk"] = &ActionContext::talk;
         creators["mention ambition"] = &ActionContext::mention_ambition;
+        creators["utility callout"] = &ActionContext::utility_callout;
+        creators["battle rez callout"] = &ActionContext::battle_rez_callout;
         creators["suggest what to do"] = &ActionContext::suggest_what_to_do;
         creators["suggest trade"] = &ActionContext::suggest_trade;
         creators["suggest dungeon"] = &ActionContext::suggest_dungeon;
@@ -341,6 +343,8 @@ private:
     static Action* talk(PlayerbotAI* botAI) { return new TalkAction(botAI); }
     static Action* suggest_what_to_do(PlayerbotAI* botAI) { return new SuggestWhatToDoAction(botAI); }
     static Action* mention_ambition(PlayerbotAI* botAI) { return new MentionAmbitionAction(botAI); }
+    static Action* utility_callout(PlayerbotAI* botAI) { return new UtilityCalloutAction(botAI); }
+    static Action* battle_rez_callout(PlayerbotAI* botAI) { return new BattleRezCalloutAction(botAI); }
     static Action* suggest_trade(PlayerbotAI* botAI) { return new SuggestTradeAction(botAI); }
     static Action* suggest_dungeon(PlayerbotAI* botAI) { return new SuggestDungeonAction(botAI); }
     static Action* aggressive_target(PlayerbotAI* botAI) { return new AggressiveTargetAction(botAI); }

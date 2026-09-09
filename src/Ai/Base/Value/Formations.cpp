@@ -148,17 +148,11 @@ public:
         float offsetY = 0.0f;
         GetPersonalSpaceOffset(botAI, master, 0.0f, 0.0f, offsetX, offsetY);
 
-        float x = master->GetPositionX() + cos(angle) * range + offsetX;
-        float y = master->GetPositionY() + sin(angle) * range + offsetY;
-        float z = master->GetPositionZ() + master->GetHoverHeight();
-        if (!map->CheckCollisionAndGetValidCoords(master, master->GetPositionX(), master->GetPositionY(),
-                                                  master->GetPositionZ(), x, y, z))
-        {
-            x = master->GetPositionX() + cos(angle) * range + offsetX;
-            y = master->GetPositionY() + sin(angle) * range + offsetY;
-            z = master->GetPositionZ() + master->GetHoverHeight();
-            master->UpdateAllowedPositionZ(x, y, z);
-        }
+        float x = 0.0f;
+        float y = 0.0f;
+        float z = 0.0f;
+        ResolveSlotOrQueue(master, map, angle, range, offsetX, offsetY, x, y, z);
+
         return WorldLocation(master->GetMapId(), x, y, z);
     }
 
@@ -205,20 +199,10 @@ public:
         GetPersonalSpaceOffset(botAI, master, driftX, driftY, dx, dy);
         dr = std::sqrt(dx * dx + dy * dy);
 
-        float x = master->GetPositionX() + std::cos(angle) * range + dx;
-        float y = master->GetPositionY() + std::sin(angle) * range + dy;
-        float z = master->GetPositionZ() + master->GetHoverHeight();
-
-        if (!map->CheckCollisionAndGetValidCoords(master, master->GetPositionX(), master->GetPositionY(),
-                                                  master->GetPositionZ(), x, y, z))
-        {
-            // Recompute a clean fallback and clamp Z
-            x = master->GetPositionX() + std::cos(angle) * range + dx;
-            y = master->GetPositionY() + std::sin(angle) * range + dy;
-            z = master->GetPositionZ() + master->GetHoverHeight();
-
-            master->UpdateAllowedPositionZ(x, y, z);
-        }
+        float x = 0.0f;
+        float y = 0.0f;
+        float z = 0.0f;
+        ResolveSlotOrQueue(master, map, angle, range, dx, dy, x, y, z);
 
         return WorldLocation(master->GetMapId(), x, y, z);
     }
@@ -594,9 +578,60 @@ float Formation::GetFollowAngle()
 
     _cachedRosterKey = rosterKey;
     _cachedSlotOffset = offset;
+    _cachedSlotIndex = index;
     _slotCacheValid = true;
 
     return start + offset;
+}
+
+// How long a bot keeps queueing after its flank clears. Without this the raycast flickering at
+// geometry edges would bounce a bot between the flank and the line every tick.
+static constexpr time_t CONFINEMENT_HOLD_SECONDS = 4;
+
+bool Formation::ResolveSlotOrQueue(Player* master, Map* map, float angle, float range, float dx,
+                                   float dy, float& x, float& y, float& z)
+{
+    float const mx = master->GetPositionX();
+    float const my = master->GetPositionY();
+    float const mz = master->GetPositionZ();
+
+    time_t const now = time(nullptr);
+    bool const stillConfined = now < _confinedUntil;
+
+    if (!stillConfined)
+    {
+        x = mx + std::cos(angle) * range + dx;
+        y = my + std::sin(angle) * range + dy;
+        z = mz + master->GetHoverHeight();
+
+        // On success this writes back a collision-adjusted position, which is exactly what we want.
+        if (map->CheckCollisionAndGetValidCoords(master, mx, my, mz, x, y, z))
+            return true;
+
+        // The flank is unreachable - a wall, a bridge railing, a corridor. Previously this branch
+        // recomputed the same blocked point and shoved the bot at it anyway.
+        _confinedUntil = now + CONFINEMENT_HOLD_SECONDS;
+    }
+
+    // Fall in behind the master, spaced by follow order so the group forms a line rather than a
+    // pile. Index is stable while group membership is, so bots hold their place in the queue.
+    float const behind = master->GetOrientation() + static_cast<float>(M_PI);
+    float const spacing = range * (1.0f + static_cast<float>(GetSlotIndex()));
+
+    x = mx + std::cos(behind) * spacing;
+    y = my + std::sin(behind) * spacing;
+    z = mz + master->GetHoverHeight();
+
+    if (map->CheckCollisionAndGetValidCoords(master, mx, my, mz, x, y, z))
+        return true;
+
+    // Even the queue is blocked, so stand where the master is standing; it is by definition
+    // reachable, and the collision avoidance will sort out the overlap.
+    x = mx;
+    y = my;
+    z = mz;
+
+    return false;
 }
 
 FormationValue::FormationValue(PlayerbotAI* botAI)

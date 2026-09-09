@@ -48,6 +48,51 @@ public:
     bool Execute(Event event) override;
 };
 
+// "I have a battle rez", "Heroism is up". The kind of thing a real group member says unprompted,
+// and genuinely useful to the player rather than just flavour.
+class UtilityCalloutAction : public SuggestWhatToDoAction
+{
+public:
+    UtilityCalloutAction(PlayerbotAI* botAI, std::string const name = "utility callout")
+        : SuggestWhatToDoAction(botAI, name)
+    {
+    }
+
+    // Only calls out cooldowns worth interrupting someone for.
+    enum class CalloutKind : uint8
+    {
+        BattleRez,
+        Haste,
+        Mana,
+        Save,
+        Utility
+    };
+
+    struct Cooldown
+    {
+        uint32 spellId;
+        CalloutKind kind;
+    };
+
+    bool isUseful() override;
+    bool Execute(Event event) override;
+
+protected:
+
+    // Ready and worth mentioning, or nullptr.
+    Cooldown const* FindReadyCooldown() const;
+    static char const* TextKeyFor(CalloutKind kind);
+};
+
+// Same callouts, but fired when someone actually dies - which is when a battle rez matters.
+class BattleRezCalloutAction : public UtilityCalloutAction
+{
+public:
+    BattleRezCalloutAction(PlayerbotAI* botAI) : UtilityCalloutAction(botAI, "battle rez callout") {}
+
+    bool isUseful() override;
+};
+
 class SuggestTradeAction : public SuggestWhatToDoAction
 {
 public:

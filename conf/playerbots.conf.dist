@@ -474,6 +474,11 @@ AiPlayerbot.LootDesireAmbitionBonus = 0.80
 # tabard and shirt are left alone as the player's own statement.
 AiPlayerbot.BotTransmog = 1
 
+# Bots mention major cooldowns in party chat - battle rezzes, Heroism/Bloodlust, Innervate, big
+# saves like Lay on Hands. A battle rez is called out the moment someone dies; everything else
+# only while the group is idle, so it stays information rather than chatter.
+AiPlayerbot.UtilityCallouts = 1
+
 #
 #
 ####################################################################################################

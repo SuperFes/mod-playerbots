@@ -30,12 +30,25 @@ public:
 protected:
     float GetFollowAngle();
 
+    // Where this bot sits in the follow order, for queueing single file. Valid after GetFollowAngle.
+    uint32 GetSlotIndex() const { return _cachedSlotIndex; }
+
+    // Resolves a reachable position for this bot: its normal slot when the flank is clear, or a
+    // place in a single-file queue behind the master when it is not. Confinement is sticky for a
+    // few seconds, because the underlying raycast flickers around geometry edges and a bot that
+    // re-decided every tick would visibly jitter between the flank and the line.
+    bool ResolveSlotOrQueue(Player* master, Map* map, float angle, float range, float dx, float dy,
+                            float& x, float& y, float& z);
+
 private:
     uint64 GetRosterKey(Player* master, Group* group) const;
 
     uint64 _cachedRosterKey = 0;
     float _cachedSlotOffset = 0.0f;
+    uint32 _cachedSlotIndex = 1;
     bool _slotCacheValid = false;
+
+    time_t _confinedUntil = 0;
 };
 
 class FollowFormation : public Formation

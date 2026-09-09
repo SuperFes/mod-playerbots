@@ -15,10 +15,15 @@
 #include "Playerbots.h"
 #include "AmbitionMgr.h"
 #include "DBCStores.h"
+#include "SpellMgr.h"
 
 // Was urand(300, 600) plus up to 300s of jitter - 5 to 15 minutes per bot, which read as silence.
 // PlayerbotAI::SocialCooldown scales these by the bot's chattiness and AiPlayerbot.SocialCooldownScale.
 // An ambition is a long arc; mentioning it every few minutes would spoil it.
+// Long enough that a callout is information, not chatter.
+static constexpr uint32 CALLOUT_COOLDOWN_MIN = 300;
+static constexpr uint32 CALLOUT_COOLDOWN_MAX = 900;
+
 static constexpr uint32 AMBITION_COOLDOWN_MIN = 900;
 static constexpr uint32 AMBITION_COOLDOWN_MAX = 2400;
 
@@ -457,4 +462,116 @@ bool MentionAmbitionAction::Execute(Event /*event*/)
         ->Set(time(nullptr) + botAI->SocialCooldown(AMBITION_COOLDOWN_MIN, AMBITION_COOLDOWN_MAX));
 
     return true;
+}
+
+// Cooldowns worth announcing. Deliberately short: a bot listing every ability it owns is noise,
+// and the point is the handful a group leader actually plans around.
+static std::vector<UtilityCalloutAction::Cooldown> const& GetCalloutTable()
+{
+    static std::vector<UtilityCalloutAction::Cooldown> const table = {
+        // battle rez - the one that changes what a group does mid-fight
+        { 20484, UtilityCalloutAction::CalloutKind::BattleRez },  // Rebirth (druid)
+        { 61999, UtilityCalloutAction::CalloutKind::BattleRez },  // Raise Ally (death knight)
+        { 27239, UtilityCalloutAction::CalloutKind::BattleRez },  // Soulstone Resurrection (warlock)
+
+        { 2825,  UtilityCalloutAction::CalloutKind::Haste },      // Bloodlust (horde shaman)
+        { 32182, UtilityCalloutAction::CalloutKind::Haste },      // Heroism (alliance shaman)
+
+        { 29166, UtilityCalloutAction::CalloutKind::Mana },       // Innervate (druid)
+        { 64901, UtilityCalloutAction::CalloutKind::Mana },       // Hymn of Hope (priest)
+
+        { 633,   UtilityCalloutAction::CalloutKind::Save },       // Lay on Hands (paladin)
+        { 19752, UtilityCalloutAction::CalloutKind::Save },       // Divine Intervention (paladin)
+        { 47788, UtilityCalloutAction::CalloutKind::Save },       // Guardian Spirit (priest)
+        { 33206, UtilityCalloutAction::CalloutKind::Save },       // Pain Suppression (priest)
+        { 740,   UtilityCalloutAction::CalloutKind::Save },       // Tranquility (druid)
+        { 871,   UtilityCalloutAction::CalloutKind::Save },       // Shield Wall (warrior)
+
+        { 43987, UtilityCalloutAction::CalloutKind::Utility },    // Ritual of Refreshment (mage)
+        { 34477, UtilityCalloutAction::CalloutKind::Utility },    // Misdirection (hunter)
+        { 57934, UtilityCalloutAction::CalloutKind::Utility },    // Tricks of the Trade (rogue)
+    };
+
+    return table;
+}
+
+char const* UtilityCalloutAction::TextKeyFor(CalloutKind kind)
+{
+    switch (kind)
+    {
+        case CalloutKind::BattleRez: return "callout_battle_rez";
+        case CalloutKind::Haste:     return "callout_haste";
+        case CalloutKind::Mana:      return "callout_mana";
+        case CalloutKind::Save:      return "callout_save";
+        default:                     return "callout_utility";
+    }
+}
+
+UtilityCalloutAction::Cooldown const* UtilityCalloutAction::FindReadyCooldown() const
+{
+    for (Cooldown const& cooldown : GetCalloutTable())
+    {
+        if (!bot->HasSpell(cooldown.spellId))
+            continue;
+
+        // Ready now - announcing one that is still on cooldown would be worse than saying nothing.
+        if (bot->HasSpellCooldown(cooldown.spellId))
+            continue;
+
+        return &cooldown;
+    }
+
+    return nullptr;
+}
+
+bool UtilityCalloutAction::isUseful()
+{
+    if (!sPlayerbotAIConfig.utilityCallouts)
+        return false;
+
+    // Only worth saying to someone who can act on it.
+    if (!botAI->HasRealPlayerMaster() || !bot->GetGroup())
+        return false;
+
+    if (time(nullptr) < AI_VALUE2(time_t, "last said", getName()))
+        return false;
+
+    return FindReadyCooldown() != nullptr;
+}
+
+bool UtilityCalloutAction::Execute(Event /*event*/)
+{
+    Cooldown const* ready = FindReadyCooldown();
+    if (!ready)
+        return false;
+
+    SpellInfo const* spellInfo = sSpellMgr->GetSpellInfo(ready->spellId);
+    if (!spellInfo)
+        return false;
+
+    std::map<std::string, std::string> placeholders;
+    placeholders["%spell_name"] = spellInfo->SpellName[sWorld->GetDefaultDbcLocale()];
+    placeholders["%my_class"] = chat->FormatClass(bot->getClass());
+
+    botAI->SayToParty(PlayerbotTextMgr::instance().GetBotTextOrDefault(
+        TextKeyFor(ready->kind), "%spell_name is ready.", placeholders));
+
+    botAI->GetAiObjectContext()->GetValue<time_t>("last said", getName())
+        ->Set(time(nullptr) + botAI->SocialCooldown(CALLOUT_COOLDOWN_MIN, CALLOUT_COOLDOWN_MAX));
+
+    return true;
+}
+
+// A death is exactly when a battle rez is worth hearing about, so this ignores the normal cooldown
+// on chatter - but only for that one kind.
+bool BattleRezCalloutAction::isUseful()
+{
+    if (!sPlayerbotAIConfig.utilityCallouts)
+        return false;
+
+    if (!botAI->HasRealPlayerMaster() || !bot->GetGroup())
+        return false;
+
+    Cooldown const* ready = FindReadyCooldown();
+    return ready && ready->kind == CalloutKind::BattleRez;
 }

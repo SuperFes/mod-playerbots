@@ -30,7 +30,8 @@ void MountStrategy::InitTriggers(std::vector<TriggerNode*>& /*triggers*/)
 
 void TradeskillStrategy::InitTriggers(std::vector<TriggerNode*>& triggers)
 {
-    if (!sPlayerbotAIConfig.tradeskillWhenIdle && !sPlayerbotAIConfig.idleSit)
+    if (!sPlayerbotAIConfig.tradeskillWhenIdle && !sPlayerbotAIConfig.idleSit &&
+        !sPlayerbotAIConfig.utilityCallouts)
         return;
 
     // Low relevance throughout: anything the bot could be doing instead should win. These only get a
@@ -41,6 +42,13 @@ void TradeskillStrategy::InitTriggers(std::vector<TriggerNode*>& triggers)
         triggers.push_back(new TriggerNode("bot idle", { NextAction("use random recipe", 1.1f) }));
         triggers.push_back(new TriggerNode("bot idle", { NextAction("enchant random item", 1.0f) }));
         triggers.push_back(new TriggerNode("bot idle", { NextAction("disenchant random item", 0.9f) }));
+    }
+
+    // Announcing a battle rez the moment someone drops is the whole point of the feature.
+    if (sPlayerbotAIConfig.utilityCallouts)
+    {
+        triggers.push_back(new TriggerNode("party member dead", { NextAction("battle rez callout", 12.0f) }));
+        triggers.push_back(new TriggerNode("bot idle", { NextAction("utility callout", 2.0f) }));
     }
 
     // Last resort: nothing to craft, nothing to do, so sit down like a person would.
