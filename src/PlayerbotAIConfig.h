@@ -114,6 +114,7 @@ public:
     bool lootCourtesy;
     float lootCourtesyMargin, lootDesireSetBonus, lootDesireBisBonus, lootDesireAmbitionBonus;
     bool botAmbitions;
+    bool botTransmog;
     uint32 criticalHealth, lowHealth, mediumHealth, almostFullHealth;
     uint32 lowMana, mediumMana, highMana;
     bool autoSaveMana;

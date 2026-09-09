@@ -77,6 +77,16 @@ BotPersonality BotPersonality::FromSeed(uint32_t seed, float strength)
 
     p.slotBias = Mix(seed ^ 0x5BF03635u);
 
+    // Taste is not scaled by strength: an outfit is either coordinated or it is not, and at
+    // strength 0 everyone simply wears whatever they have with no transmog applied at all.
+    float const tasteRoll = Unit(seed, 9);
+    if (tasteRoll < TASTE_TERRIBLE_SHARE)
+        p.taste = BotTaste::Terrible;
+    else if (tasteRoll < TASTE_TERRIBLE_SHARE + TASTE_IMMACULATE_SHARE)
+        p.taste = BotTaste::Immaculate;
+    else if (tasteRoll < TASTE_TERRIBLE_SHARE + TASTE_IMMACULATE_SHARE + TASTE_ECLECTIC_SHARE)
+        p.taste = BotTaste::Eclectic;
+
     // Scaled by strength so PersonalityStrength=0 leaves every bot ambitionless, and capped at the
     // full share so an exaggerated strength does not give literally everyone a goal.
     float const ambitionShare = AMBITION_SHARE * std::min(1.0f, strength);

@@ -466,6 +466,14 @@ AiPlayerbot.BotAmbitions = 1
 # Set above LootDesireBisBonus so a bot visibly wants the thing it has been chasing.
 AiPlayerbot.LootDesireAmbitionBonus = 0.80
 
+# Bots dress themselves through mod-transmog, seeded from the same personality as everything else,
+# so a bot keeps the same outfit across restarts. Ignored when mod-transmog is not installed.
+# Taste varies: most bots hold one colour and one look family, some mix families deliberately,
+# a few wear their ambition set's look while collecting it, and a small number have no taste at
+# all and clash on every slot. Head, shoulders, chest, waist, legs, feet, wrists and hands only -
+# tabard and shirt are left alone as the player's own statement.
+AiPlayerbot.BotTransmog = 1
+
 #
 #
 ####################################################################################################

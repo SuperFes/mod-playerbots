@@ -10,6 +10,7 @@
 #include "BotPersonality.h"
 #include <iostream>
 #include "AmbitionMgr.h"
+#include "BotAppearanceMgr.h"
 #include "BisListMgr.h"
 #include "Config.h"
 #include "NewRpgInfo.h"
@@ -133,6 +134,7 @@ bool PlayerbotAIConfig::Initialize()
         std::max(0.0f, sConfigMgr->GetOption<float>("AiPlayerbot.LootDesireAmbitionBonus", 0.80f));
 
     botAmbitions = sConfigMgr->GetOption<bool>("AiPlayerbot.BotAmbitions", true);
+    botTransmog = sConfigMgr->GetOption<bool>("AiPlayerbot.BotTransmog", true);
 
     criticalHealth = sConfigMgr->GetOption<int32>("AiPlayerbot.CriticalHealth", 25);
     lowHealth = sConfigMgr->GetOption<int32>("AiPlayerbot.LowHealth", 45);
@@ -774,6 +776,7 @@ bool PlayerbotAIConfig::Initialize()
     sRandomItemMgr.InitAfterAhBot();
     sBisListMgr->LoadAll();
     sAmbitionMgr->LoadAll();
+    sBotAppearanceMgr->LoadAll();
     PlayerbotTextMgr::instance().LoadBotTexts();
     PlayerbotTextMgr::instance().LoadBotTextChance();
     PlayerbotFactory::Init();

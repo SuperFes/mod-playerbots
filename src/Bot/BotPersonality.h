@@ -26,6 +26,15 @@ enum class BotAmbitionKind : uint8_t
     Set         // a whole tier set, which is a much longer arc
 };
 
+// How a bot puts an outfit together. Most look deliberate; the interest is in the tails.
+enum class BotTaste : uint8_t
+{
+    Coordinated = 0,  // one colour family, consistently
+    Eclectic,         // mixes families on purpose, holds one colour
+    Immaculate,       // a full matched set, no compromises
+    Terrible          // clashing colours and mismatched materials, entirely sincere
+};
+
 struct BotPersonality
 {
     // Hard bounds. Traits are clamped here after strength scaling so an exaggerated
@@ -61,6 +70,12 @@ struct BotPersonality
     static constexpr float AMBITION_SHARE = 0.65f;
     static constexpr float AMBITION_SET_SHARE = 0.35f;
 
+    // Taste splits: the rest are Coordinated. Terrible is rare on purpose - it is funny once per
+    // party, not once per bot.
+    static constexpr float TASTE_ECLECTIC_SHARE = 0.22f;
+    static constexpr float TASTE_IMMACULATE_SHARE = 0.10f;
+    static constexpr float TASTE_TERRIBLE_SHARE = 0.06f;
+
     // Builds the traits for a bot. `seed` is the bot's GUID counter; `strength` scales every trait
     // away from neutral, so 0 reproduces uniform bots exactly and values above 1 exaggerate.
     static BotPersonality FromSeed(uint32_t seed, float strength);
@@ -77,6 +92,7 @@ struct BotPersonality
     float generosity = 1.0f;      // >1 defers loot to a groupmate on a smaller margin
     uint32_t slotBias = 0;        // stable tie-break for formation slot ordering
     BotAmbitionKind ambition = BotAmbitionKind::None;
+    BotTaste taste = BotTaste::Coordinated;
 };
 
 #endif
