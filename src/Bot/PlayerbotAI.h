@@ -614,6 +614,16 @@ public:
     // minutes of this, which is time a person would spend on something useful.
     uint32 GetIdleSeconds() const;
 
+    // While the master is in a capital city, bots stop shadowing them and get on with their own
+    // business. The instant the master leaves - on foot, by flight, or onto a boat - autonomy ends
+    // and the bot rejoins. That keeps the out-of-range window to seconds, which matters because
+    // MaxGroupXPDistance (74y) gates XP, quest credit and loot on proximity.
+    bool IsCityAutonomyActive();
+
+    // Peek and clear are separate so isUseful() stays free of side effects.
+    bool IsCityRejoinPending() const { return _cityRejoinPending; }
+    void ClearCityRejoin() { _cityRejoinPending = false; }
+
     std::vector<const Quest*> GetAllCurrentQuests();
     std::vector<const Quest*> GetCurrentIncompleteQuests();
     std::set<uint32> GetAllCurrentQuestIds();
@@ -677,6 +687,8 @@ protected:
     bool spellInterruptRequested = false;
     BotPersonality _personality;
     time_t _lastActiveTime = 0;
+    bool _cityAutonomyActive = false;
+    bool _cityRejoinPending = false;
 };
 
 #endif

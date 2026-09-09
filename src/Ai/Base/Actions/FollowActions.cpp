@@ -283,6 +283,10 @@ bool FollowAction::Execute(Event /*event*/)
 
 bool FollowAction::isUseful()
 {
+    // Parked in a capital: the bot has its own business and rejoins the moment the master leaves.
+    if (botAI->IsCityAutonomyActive())
+        return false;
+
     // move from group takes priority over follow as it's added and removed automatically
     // (without removing/adding follow)
     if (botAI->HasStrategy("move from group", BOT_STATE_COMBAT) ||

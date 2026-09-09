@@ -278,6 +278,13 @@ void PlayerbotAI::UpdateAI(uint32 elapsed, bool minimal)
     if (bot->IsInCombat() || bot->isMoving())
         _lastActiveTime = time(nullptr);
 
+    // Edge-detect the end of city autonomy so the bot rejoins once rather than every tick.
+    bool const autonomyNow = IsCityAutonomyActive();
+    if (_cityAutonomyActive && !autonomyNow)
+        _cityRejoinPending = true;
+
+    _cityAutonomyActive = autonomyNow;
+
     // Handle cheat options (set bot health and power if cheats are enabled)
     if (bot->IsAlive() &&
         (static_cast<uint32>(GetCheat()) > 0 || static_cast<uint32>(sPlayerbotAIConfig.botCheatMask) > 0))
@@ -6770,6 +6777,34 @@ std::set<uint32> PlayerbotAI::GetCurrentIncompleteQuestIds()
     }
 
     return result;
+}
+
+bool PlayerbotAI::IsCityAutonomyActive()
+{
+    if (!sPlayerbotAIConfig.cityAutonomy)
+        return false;
+
+    Player* master = GetMaster();
+    if (!master || !HasActivePlayerMaster())
+        return false;
+
+    // Anything that means the master is leaving, or that the bot is needed.
+    if (bot->IsInCombat() || master->IsInCombat() || currentState == BOT_STATE_COMBAT)
+        return false;
+
+    if (master->IsInFlight() || master->HasUnitState(UNIT_STATE_IN_FLIGHT) || master->GetTransport())
+        return false;
+
+    if (bot->GetMapId() != master->GetMapId())
+        return false;
+
+    // Both of us have to be in the same capital: the point is that nothing is being missed while
+    // the group is parked in town.
+    AreaTableEntry const* masterZone = sAreaTableStore.LookupEntry(master->GetZoneId());
+    if (!masterZone || !(masterZone->flags & AREA_FLAG_CAPITAL))
+        return false;
+
+    return bot->GetZoneId() == master->GetZoneId();
 }
 
 uint32 PlayerbotAI::GetIdleSeconds() const

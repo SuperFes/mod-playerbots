@@ -138,6 +138,9 @@ bool PlayerbotAIConfig::Initialize()
     utilityCallouts = sConfigMgr->GetOption<bool>("AiPlayerbot.UtilityCallouts", true);
     ambientSay = sConfigMgr->GetOption<bool>("AiPlayerbot.AmbientSay", true);
     vendorDeclutter = sConfigMgr->GetOption<bool>("AiPlayerbot.VendorDeclutter", true);
+    cityAutonomy = sConfigMgr->GetOption<bool>("AiPlayerbot.CityAutonomy", true);
+    cityAutonomyRadius =
+        std::max(20.0f, sConfigMgr->GetOption<float>("AiPlayerbot.CityAutonomyRadius", 80.0f));
 
     criticalHealth = sConfigMgr->GetOption<int32>("AiPlayerbot.CriticalHealth", 25);
     lowHealth = sConfigMgr->GetOption<int32>("AiPlayerbot.LowHealth", 45);

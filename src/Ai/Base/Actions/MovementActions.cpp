@@ -2995,3 +2995,70 @@ bool MoveAwayFromPlayerWithDebuffAction::Execute(Event /*event*/)
 }
 
 bool MoveAwayFromPlayerWithDebuffAction::isPossible() { return bot->CanFreeMove(); }
+
+bool CityWanderAction::isUseful()
+{
+    if (!botAI->IsCityAutonomyActive())
+        return false;
+
+    if (bot->IsInCombat() || bot->isMoving() || bot->IsMounted())
+        return false;
+
+    // Sitting bots stay sat until something else stands them up.
+    return !bot->IsSitState();
+}
+
+bool CityWanderAction::Execute(Event event)
+{
+    Player* master = GetMaster();
+    if (!master)
+        return false;
+
+    // Loose leash. Bots drift around town but not out of it, so the master never has to go looking.
+    if (bot->GetExactDist2d(master) > sPlayerbotAIConfig.cityAutonomyRadius)
+    {
+        return MoveTo(bot->GetMapId(), master->GetPositionX(), master->GetPositionY(),
+                      master->GetPositionZ(), false, false, false, true,
+                      MovementPriority::MOVEMENT_NORMAL);
+    }
+
+    return MoveRandomAction::Execute(event);
+}
+
+bool RejoinMasterAction::isUseful()
+{
+    if (!botAI->IsCityRejoinPending())
+        return false;
+
+    Player* master = GetMaster();
+    return master && !bot->IsInCombat();
+}
+
+bool RejoinMasterAction::Execute(Event /*event*/)
+{
+    Player* master = GetMaster();
+    if (!master)
+        return false;
+
+    botAI->ClearCityRejoin();
+
+    // Already alongside them - nothing to announce, they never actually left us behind.
+    if (bot->GetMapId() == master->GetMapId() &&
+        bot->GetExactDist2d(master) <= sPlayerbotAIConfig.cityAutonomyRadius)
+        return false;
+
+    std::map<std::string, std::string> placeholders;
+    placeholders["%my_class"] = chat->FormatClass(bot->getClass());
+
+    botAI->SayToParty(PlayerbotTextMgr::instance().GetBotTextOrDefault(
+        "city_rejoin", "Coming!", placeholders));
+
+    if (bot->IsSitState())
+        bot->SetStandState(UNIT_STAND_STATE_STAND);
+
+    bot->RemoveAurasWithInterruptFlags(AURA_INTERRUPT_FLAG_TELEPORTED | AURA_INTERRUPT_FLAG_CHANGE_MAP);
+    bot->TeleportTo(master->GetMapId(), master->GetPositionX(), master->GetPositionY(),
+                    master->GetPositionZ(), master->GetOrientation());
+
+    return true;
+}

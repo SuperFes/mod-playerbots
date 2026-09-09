@@ -118,6 +118,8 @@ public:
     bool utilityCallouts;
     bool ambientSay;
     bool vendorDeclutter;
+    bool cityAutonomy;
+    float cityAutonomyRadius;
     uint32 criticalHealth, lowHealth, mediumHealth, almostFullHealth;
     uint32 lowMana, mediumMana, highMana;
     bool autoSaveMana;

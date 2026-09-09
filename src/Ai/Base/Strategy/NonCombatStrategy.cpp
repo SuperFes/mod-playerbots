@@ -16,6 +16,12 @@ void NonCombatStrategy::InitTriggers(std::vector<TriggerNode*>& triggers)
     // The action returns false when there is nothing to mount or dismount, so it never steals a tick.
     triggers.push_back(new TriggerNode("timer", { NextAction("check mount state", 66.0f) }));
     triggers.push_back(new TriggerNode("far from master", { NextAction("follow", 65.0f) }));
+
+    // Above follow: the master has left town and the bot needs to catch up before anything else.
+    triggers.push_back(new TriggerNode("often", { NextAction("rejoin master", 70.0f) }));
+
+    // Below everything: pottering about town is what a bot does when nothing else wants a tick.
+    triggers.push_back(new TriggerNode("often", { NextAction("city wander", 0.6f) }));
 }
 
 void CollisionStrategy::InitTriggers(std::vector<TriggerNode*>& triggers)

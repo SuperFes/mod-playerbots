@@ -148,6 +148,8 @@ public:
         creators["utility callout"] = &ActionContext::utility_callout;
         creators["ambient say"] = &ActionContext::ambient_say;
         creators["vendor declutter"] = &ActionContext::vendor_declutter;
+        creators["city wander"] = &ActionContext::city_wander;
+        creators["rejoin master"] = &ActionContext::rejoin_master;
         creators["battle rez callout"] = &ActionContext::battle_rez_callout;
         creators["suggest what to do"] = &ActionContext::suggest_what_to_do;
         creators["suggest trade"] = &ActionContext::suggest_trade;
@@ -349,6 +351,8 @@ private:
     static Action* utility_callout(PlayerbotAI* botAI) { return new UtilityCalloutAction(botAI); }
     static Action* ambient_say(PlayerbotAI* botAI) { return new AmbientSayAction(botAI); }
     static Action* vendor_declutter(PlayerbotAI* botAI) { return new VendorDeclutterAction(botAI); }
+    static Action* city_wander(PlayerbotAI* botAI) { return new CityWanderAction(botAI); }
+    static Action* rejoin_master(PlayerbotAI* botAI) { return new RejoinMasterAction(botAI); }
     static Action* battle_rez_callout(PlayerbotAI* botAI) { return new BattleRezCalloutAction(botAI); }
     static Action* suggest_trade(PlayerbotAI* botAI) { return new SuggestTradeAction(botAI); }
     static Action* suggest_dungeon(PlayerbotAI* botAI) { return new SuggestDungeonAction(botAI); }

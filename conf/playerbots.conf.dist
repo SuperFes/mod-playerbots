@@ -490,6 +490,17 @@ AiPlayerbot.AmbientSay = 1
 # Uses the same item classification as the sell command, so nothing the bot may still want is sold.
 AiPlayerbot.VendorDeclutter = 1
 
+# While you are parked in a capital city, bots stop shadowing you and get on with their own
+# business - wandering, crafting, selling junk, sitting down. The moment you leave, by any means,
+# they say so and teleport to you. Autonomy only ever happens while you are in the city too, so
+# the out-of-range window is seconds: MaxGroupXPDistance (74 yards, worldserver.conf) gates XP,
+# quest credit and loot on proximity, and nothing is missed while the group is parked.
+AiPlayerbot.CityAutonomy = 1
+
+# How far from you a bot will drift while pottering. Beyond this it heads back rather than
+# wandering further, so you never have to go looking for one. Minimum 20.
+AiPlayerbot.CityAutonomyRadius = 80
+
 #
 #
 ####################################################################################################

@@ -241,10 +241,34 @@ public:
 class MoveRandomAction : public MovementAction
 {
 public:
-    MoveRandomAction(PlayerbotAI* botAI) : MovementAction(botAI, "move random") {}
+    MoveRandomAction(PlayerbotAI* botAI, std::string const name = "move random")
+        : MovementAction(botAI, name)
+    {
+    }
 
     bool Execute(Event event) override;
     bool isUseful() override;
+};
+
+// Milling about town while the master is parked there. Deliberately aimless - the point is that
+// bots look like they have their own business, not that the business is real.
+class CityWanderAction : public MoveRandomAction
+{
+public:
+    CityWanderAction(PlayerbotAI* botAI) : MoveRandomAction(botAI, "city wander") {}
+
+    bool isUseful() override;
+    bool Execute(Event event) override;
+};
+
+// Master has left the city, on foot or otherwise. Say so and catch up.
+class RejoinMasterAction : public MovementAction
+{
+public:
+    RejoinMasterAction(PlayerbotAI* botAI) : MovementAction(botAI, "rejoin master") {}
+
+    bool isUseful() override;
+    bool Execute(Event event) override;
 };
 
 class MoveInsideAction : public MovementAction
