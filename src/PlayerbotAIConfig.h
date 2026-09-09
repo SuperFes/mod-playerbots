@@ -116,6 +116,8 @@ public:
     bool botAmbitions;
     bool botTransmog;
     bool utilityCallouts;
+    bool ambientSay;
+    bool vendorDeclutter;
     uint32 criticalHealth, lowHealth, mediumHealth, almostFullHealth;
     uint32 lowMana, mediumMana, highMana;
     bool autoSaveMana;

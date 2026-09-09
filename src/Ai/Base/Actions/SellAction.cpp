@@ -135,3 +135,35 @@ void SellAction::Sell(Item* item)
         break;
     }
 }
+
+bool VendorDeclutterAction::HasVendorNearby() const
+{
+    GuidVector const npcs = botAI->GetAiObjectContext()->GetValue<GuidVector>("nearest npcs")->Get();
+    for (ObjectGuid const guid : npcs)
+        if (bot->GetNPCIfCanInteractWith(guid, UNIT_NPC_FLAG_VENDOR))
+            return true;
+
+    return false;
+}
+
+bool VendorDeclutterAction::isUseful()
+{
+    if (!sPlayerbotAIConfig.vendorDeclutter)
+        return false;
+
+    if (bot->IsInCombat() || botAI->GetState() == BOT_STATE_COMBAT || bot->isMoving())
+        return false;
+
+    // Only once the group has actually stopped, so bots do not peel off mid-pull to sell greys.
+    if (botAI->GetIdleSeconds() < sPlayerbotAIConfig.tradeskillIdleSeconds)
+        return false;
+
+    return HasVendorNearby();
+}
+
+bool VendorDeclutterAction::Execute(Event /*event*/)
+{
+    // "vendor" selects the ItemUsage-driven visitor: greys plus anything classed as vendor trash,
+    // and nothing the bot might still want.
+    return SellAction::Execute(Event("vendor declutter", "vendor"));
+}

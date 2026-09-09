@@ -23,4 +23,19 @@ public:
     void Sell(Item* item);
 };
 
+// Clearing out junk while standing at a vendor, unprompted. Deliberately does not walk anywhere:
+// SellAction already finds a vendor among the nearby NPCs, so this only fires when the bot happens
+// to be next to one - which is what a person does while the group is stopped in town.
+class VendorDeclutterAction : public SellAction
+{
+public:
+    VendorDeclutterAction(PlayerbotAI* botAI) : SellAction(botAI, "vendor declutter") {}
+
+    bool isUseful() override;
+    bool Execute(Event event) override;
+
+private:
+    bool HasVendorNearby() const;
+};
+
 #endif

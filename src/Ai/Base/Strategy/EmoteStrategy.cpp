@@ -13,6 +13,7 @@ void EmoteStrategy::InitTriggers(std::vector<TriggerNode*>& triggers)
     if (sPlayerbotAIConfig.randomBotEmote)
     {
         triggers.push_back(new TriggerNode("sometimes", { NextAction("talk", 1.0f) }));
+        triggers.push_back(new TriggerNode("sometimes", { NextAction("ambient say", 0.9f) }));
         triggers.push_back(new TriggerNode("sometimes", { NextAction("emote", 1.0f) }));
         triggers.push_back(
             new TriggerNode("receive text emote", { NextAction("emote", 10.0f) }));

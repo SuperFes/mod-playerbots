@@ -93,6 +93,18 @@ public:
     bool isUseful() override;
 };
 
+// Local muttering in /say rather than a channel: an observation about where the bot is standing,
+// audible only to people actually there. Brings broadcast_city_arrival into use - the pool existed
+// but nothing had ever emitted it.
+class AmbientSayAction : public SuggestWhatToDoAction
+{
+public:
+    AmbientSayAction(PlayerbotAI* botAI) : SuggestWhatToDoAction(botAI, "ambient say") {}
+
+    bool isUseful() override;
+    bool Execute(Event event) override;
+};
+
 class SuggestTradeAction : public SuggestWhatToDoAction
 {
 public:

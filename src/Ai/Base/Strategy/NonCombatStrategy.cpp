@@ -31,7 +31,7 @@ void MountStrategy::InitTriggers(std::vector<TriggerNode*>& /*triggers*/)
 void TradeskillStrategy::InitTriggers(std::vector<TriggerNode*>& triggers)
 {
     if (!sPlayerbotAIConfig.tradeskillWhenIdle && !sPlayerbotAIConfig.idleSit &&
-        !sPlayerbotAIConfig.utilityCallouts)
+        !sPlayerbotAIConfig.utilityCallouts && !sPlayerbotAIConfig.vendorDeclutter)
         return;
 
     // Low relevance throughout: anything the bot could be doing instead should win. These only get a
@@ -50,6 +50,10 @@ void TradeskillStrategy::InitTriggers(std::vector<TriggerNode*>& triggers)
         triggers.push_back(new TriggerNode("party member dead", { NextAction("battle rez callout", 12.0f) }));
         triggers.push_back(new TriggerNode("bot idle", { NextAction("utility callout", 2.0f) }));
     }
+
+    // Standing at a vendor with a bag of greys is the obvious moment to clear them out.
+    if (sPlayerbotAIConfig.vendorDeclutter)
+        triggers.push_back(new TriggerNode("bot idle", { NextAction("vendor declutter", 1.5f) }));
 
     // Last resort: nothing to craft, nothing to do, so sit down like a person would.
     if (sPlayerbotAIConfig.idleSit)

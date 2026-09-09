@@ -21,6 +21,10 @@
 // PlayerbotAI::SocialCooldown scales these by the bot's chattiness and AiPlayerbot.SocialCooldownScale.
 // An ambition is a long arc; mentioning it every few minutes would spoil it.
 // Long enough that a callout is information, not chatter.
+// Local chatter is heard by anyone standing nearby, so it wants to be rare.
+static constexpr uint32 AMBIENT_COOLDOWN_MIN = 420;
+static constexpr uint32 AMBIENT_COOLDOWN_MAX = 1200;
+
 static constexpr uint32 CALLOUT_COOLDOWN_MIN = 300;
 static constexpr uint32 CALLOUT_COOLDOWN_MAX = 900;
 
@@ -574,4 +578,54 @@ bool BattleRezCalloutAction::isUseful()
 
     Cooldown const* ready = FindReadyCooldown();
     return ready && ready->kind == CalloutKind::BattleRez;
+}
+
+namespace
+{
+    // Capital cities. AreaTableEntry::flags carries 312 for all of them; AREA_FLAG_CAPITAL is the
+    // bit the core itself tests when deciding resting state.
+    bool IsInCapitalCity(Player* bot)
+    {
+        AreaTableEntry const* zone = sAreaTableStore.LookupEntry(bot->GetZoneId());
+        return zone && (zone->flags & AREA_FLAG_CAPITAL);
+    }
+}
+
+bool AmbientSayAction::isUseful()
+{
+    if (!sPlayerbotAIConfig.ambientSay)
+        return false;
+
+    if (bot->IsInCombat() || botAI->GetState() == BOT_STATE_COMBAT)
+        return false;
+
+    if (!IsInCapitalCity(bot))
+        return false;
+
+    return time(nullptr) >= AI_VALUE2(time_t, "last said", getName());
+}
+
+bool AmbientSayAction::Execute(Event /*event*/)
+{
+    AreaTableEntry const* zone = sAreaTableStore.LookupEntry(bot->GetZoneId());
+    AreaTableEntry const* area = sAreaTableStore.LookupEntry(bot->GetAreaId());
+    if (!zone)
+        return false;
+
+    std::map<std::string, std::string> placeholders;
+    placeholders["%zone_name"] = botAI->GetLocalizedAreaName(zone);
+    placeholders["%area_name"] = area ? botAI->GetLocalizedAreaName(area) : placeholders["%zone_name"];
+
+    std::string const line =
+        PlayerbotTextMgr::instance().GetBotTextOrDefault("broadcast_city_arrival", "", placeholders);
+
+    if (line.empty())
+        return false;
+
+    botAI->Say(line);
+
+    botAI->GetAiObjectContext()->GetValue<time_t>("last said", getName())
+        ->Set(time(nullptr) + botAI->SocialCooldown(AMBIENT_COOLDOWN_MIN, AMBIENT_COOLDOWN_MAX));
+
+    return true;
 }

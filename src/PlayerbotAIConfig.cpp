@@ -136,6 +136,8 @@ bool PlayerbotAIConfig::Initialize()
     botAmbitions = sConfigMgr->GetOption<bool>("AiPlayerbot.BotAmbitions", true);
     botTransmog = sConfigMgr->GetOption<bool>("AiPlayerbot.BotTransmog", true);
     utilityCallouts = sConfigMgr->GetOption<bool>("AiPlayerbot.UtilityCallouts", true);
+    ambientSay = sConfigMgr->GetOption<bool>("AiPlayerbot.AmbientSay", true);
+    vendorDeclutter = sConfigMgr->GetOption<bool>("AiPlayerbot.VendorDeclutter", true);
 
     criticalHealth = sConfigMgr->GetOption<int32>("AiPlayerbot.CriticalHealth", 25);
     lowHealth = sConfigMgr->GetOption<int32>("AiPlayerbot.LowHealth", 45);

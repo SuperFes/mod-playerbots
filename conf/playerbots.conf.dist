@@ -479,6 +479,16 @@ AiPlayerbot.BotTransmog = 1
 # only while the group is idle, so it stays information rather than chatter.
 AiPlayerbot.UtilityCallouts = 1
 
+# Bots occasionally remark on where they are, in local /say rather than a channel, so only people
+# standing nearby hear it. Capital cities only for now: the weather lines in the text pool are not
+# tagged by actual weather state, so emitting them would mean commenting on rain in the sunshine.
+AiPlayerbot.AmbientSay = 1
+
+# Bots sell junk when the group is stopped next to a vendor. They never walk to one - this only
+# fires when a vendor already happens to be in interaction range, so bots cannot wander off.
+# Uses the same item classification as the sell command, so nothing the bot may still want is sold.
+AiPlayerbot.VendorDeclutter = 1
+
 #
 #
 ####################################################################################################

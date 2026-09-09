@@ -25,6 +25,8 @@ namespace
     // boarding moves in a straight line with no pathfinding, so a large gap must never be attempted.
     constexpr float STATIC_TRANSPORT_BOARD_Z_TOLERANCE = 3.0f;
     constexpr float STATIC_TRANSPORT_BOARD_RANGE = 20.0f;
+    // Close enough to the base to count as waiting for it.
+    constexpr float STATIC_TRANSPORT_WAIT_RANGE = 6.0f;
 
     Transport* GetTransportForPosTolerant(Map* map, WorldObject* ref, uint32 phaseMask, float x, float y, float z)
     {
@@ -134,9 +136,35 @@ bool FollowAction::Execute(Event /*event*/)
         // into the shaft wall. Judge by the master's height rather than the transport's, because a
         // static transport's own position is its base, not its deck.
         bool const staticTransport = transport && transport->IsStaticTransport();
-        if (staticTransport &&
-            std::fabs(master->GetPositionZ() - bot->GetPositionZ()) > STATIC_TRANSPORT_BOARD_Z_TOLERANCE)
-            transport = nullptr;
+        bool const liftOutOfReach = staticTransport &&
+            std::fabs(master->GetPositionZ() - bot->GetPositionZ()) > STATIC_TRANSPORT_BOARD_Z_TOLERANCE;
+
+        if (liftOutOfReach)
+        {
+            // The master is riding a lift we cannot step onto. Chasing them means pathfinding at a
+            // point in mid-air, which is what left bots circling at the bottom of Telredor. Wait at
+            // the platform's base instead - where a person would stand for it to come back down.
+            float const baseX = transport->GetPositionX();
+            float const baseY = transport->GetPositionY();
+            float baseZ = transport->GetPositionZ();
+
+            if (bot->GetExactDist2d(baseX, baseY) > STATIC_TRANSPORT_WAIT_RANGE)
+            {
+                map->LoadGrid(baseX, baseY);
+                bot->UpdateAllowedPositionZ(baseX, baseY, baseZ);
+
+                if (MoveTo(bot->GetMapId(), baseX, baseY, baseZ, false, false, false, true,
+                           MovementPriority::MOVEMENT_NORMAL))
+                    return true;
+            }
+
+            // Standing at the boarding point already: hold position rather than wander off, so the
+            // bot is there when the platform returns.
+            if (bot->isMoving())
+                bot->StopMoving();
+
+            return true;
+        }
 
         if (transport && map && bot->GetTransport() != transport)
         {
