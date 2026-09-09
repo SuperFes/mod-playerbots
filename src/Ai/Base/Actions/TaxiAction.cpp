@@ -90,16 +90,63 @@ bool TaxiAction::Execute(Event event)
 
             delay = std::min(delay, sPlayerbotAIConfig.botTaxiDelayMax);
 
-            // Store the NPC's GUID so we can re-acquire the pointer later
-            ObjectGuid npcGuid = npc->GetGUID();
+            // Copy the route rather than capturing the LastMovement reference: this runs up to several
+            // seconds later, by which point the master may have cleared it.
+            std::vector<uint32> const nodes = movement.taxiNodes;
+            ObjectGuid const botGuid = bot->GetGUID();
+            ObjectGuid const npcGuid = npc->GetGUID();
 
             // schedule the take-off
             botAI->AddTimedEvent(
-                [bot = bot, &movement, npcGuid]() -> void
+                [botGuid, npcGuid, nodes]() -> void
                 {
-                    if (Creature* npcPtr = ObjectAccessor::GetCreature(*bot, npcGuid))
-                        if (!movement.taxiNodes.empty())
-                            bot->ActivateTaxiPathTo(movement.taxiNodes, npcPtr, 0);
+                    // Resolve from the GUID - a raw Player* would dangle if the bot logged out or was
+                    // removed during the stagger delay.
+                    Player* self = ObjectAccessor::FindPlayer(botGuid);
+                    if (!self)
+                        return;
+
+                    PlayerbotAI* selfAI = GET_PLAYERBOT_AI(self);
+                    if (!selfAI)
+                        return;
+
+                    if (nodes.size() < 2)
+                    {
+                        selfAI->TellMaster(PlayerbotTextMgr::instance().GetBotTextOrDefault(
+                            "taxi_no_route_remembered", "I did not catch which flight you took", {}));
+                        return;
+                    }
+
+                    if (self->IsInCombat())
+                    {
+                        selfAI->TellMaster(PlayerbotTextMgr::instance().GetBotTextOrDefault(
+                            "taxi_in_combat", "I am in combat and cannot board the flight", {}));
+                        return;
+                    }
+
+                    // Player::ActivateTaxiPathTo refuses outright if the bot is mounted, shapeshifted or
+                    // casting - but only when a flight master is passed. Those guards exist to stop a
+                    // modified client starting a flight mounted; a real client dismounts you when you pick
+                    // a destination, and they are meaningless for a server-side bot. Clear the states
+                    // ourselves rather than dropping the flight master, because that argument is what
+                    // applies the reputation price discount and records the flight master's faction.
+                    self->RemoveAurasByType(SPELL_AURA_MOUNTED);
+
+                    if (self->IsInDisallowedMountForm())
+                        self->RemoveAurasByType(SPELL_AURA_MOD_SHAPESHIFT);
+
+                    if (self->IsNonMeleeSpellCast(false))
+                        self->InterruptNonMeleeSpells(false);
+
+                    // Falls back to no flight master only if it has gone out of range - full fare beats
+                    // not flying at all.
+                    Creature* flightMaster = ObjectAccessor::GetCreature(*self, npcGuid);
+
+                    if (!self->ActivateTaxiPathTo(nodes, flightMaster, 0))
+                    {
+                        selfAI->TellMaster(PlayerbotTextMgr::instance().GetBotTextOrDefault(
+                            "taxi_could_not_board", "I could not board that flight - check my gold", {}));
+                    }
                 },
                 delay);
             botAI->SetNextCheckDelay(delay + 50);
