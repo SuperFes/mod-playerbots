@@ -11,6 +11,7 @@
 
 class PlayerbotAI;
 
+class Group;
 struct ItemTemplate;
 
 enum RollVote : uint8;
@@ -24,6 +25,10 @@ public:
 
 protected:
     RollVote CalculateRollVote(ItemTemplate const* proto, ItemUsage usage = ITEM_USAGE_NONE);
+
+    // True when a bot in the group wants this item clearly more than we do, so we should not roll
+    // NEED against them. Only ever compares against other bots - real players roll for themselves.
+    bool ShouldDeferToGroupmate(Group* group, ItemTemplate const* proto, int32 randomPropertyId);
 };
 
 bool CanBotUseToken(ItemTemplate const* proto, Player* bot);

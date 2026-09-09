@@ -38,4 +38,15 @@ public:
     bool isUseful() override;
 };
 
+// Sitting down while the group waits on a spawn or a summon. Distinct from StayAction, which is a
+// command; this is what a bot does when nothing else wants a tick.
+class IdleSitAction : public Action
+{
+public:
+    IdleSitAction(PlayerbotAI* botAI) : Action(botAI, "idle sit") {}
+
+    bool isUseful() override;
+    bool Execute(Event event) override;
+};
+
 #endif

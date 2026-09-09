@@ -432,6 +432,40 @@ AiPlayerbot.SocialCooldownScale = 1.0
 # (crafting, recipes, enchanting, disenchanting). All of it is done in place - bots never walk off.
 AiPlayerbot.TradeskillIdleSeconds = 30
 
+# Bots work on their tradeskills while idle (crafting, recipes, enchanting, disenchanting).
+# All of it happens in place - bots never walk off to do it.
+AiPlayerbot.TradeskillWhenIdle = 1
+
+# Bots sit down once they have been idle for TradeskillIdleSeconds and have nothing else to do.
+# They stand again as soon as anything asks them to move.
+AiPlayerbot.IdleSit = 1
+
+# Bots avoid rolling NEED against a groupmate who wants the item more, judged on stat upgrade,
+# item set completion and the class/spec best-in-slot list. Only ever defers to other bots -
+# real players always roll for themselves.
+AiPlayerbot.LootCourtesy = 1
+
+# How much more a groupmate must want an item before a bot steps aside. 1.25 means 25% more.
+# Values below 1.0 are clamped to 1.0. Each bot's generosity trait widens or narrows this,
+# so a generous bot defers sooner and a selfish one needs to be clearly outmatched.
+AiPlayerbot.LootCourtesyMargin = 1.25
+
+# Weightings used when judging how much a bot wants an item, as a fraction of the item's own score.
+# SetBonus is added per already-equipped piece of the same item set; BisBonus is added when the
+# item is that bot's best-in-slot for the destination slot. Set either to 0 to ignore that signal.
+AiPlayerbot.LootDesireSetBonus = 0.08
+AiPlayerbot.LootDesireBisBonus = 0.35
+
+# Bots pursue a long-term goal - a specific upgrade, or a whole tier set. Which bots have one, and
+# whether it is an item or a set, comes from their personality: at PersonalityStrength 1 roughly a
+# third of bots want nothing in particular, which is deliberate. The goal is derived from the bot's
+# class, spec and gear tier rather than stored, so it advances on its own as the bot progresses.
+AiPlayerbot.BotAmbitions = 1
+
+# Weighting for an item that is the bot's current ambition, as a fraction of the item's own score.
+# Set above LootDesireBisBonus so a bot visibly wants the thing it has been chasing.
+AiPlayerbot.LootDesireAmbitionBonus = 0.80
+
 #
 #
 ####################################################################################################

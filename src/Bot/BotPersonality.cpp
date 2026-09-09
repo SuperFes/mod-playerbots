@@ -51,6 +51,10 @@ BotPersonality BotPersonality::FromSeed(uint32_t seed, float strength)
         Scale(1.0f, Band(SOCIAL_BAND_LOW, SOCIAL_BAND_HIGH, Unit(seed, 3)), strength),
         SOCIAL_MIN, SOCIAL_MAX);
 
+    p.generosity = std::clamp(
+        Scale(1.0f, Band(GENEROSITY_BAND_LOW, GENEROSITY_BAND_HIGH, Unit(seed, 6)), strength),
+        GENEROSITY_MIN, GENEROSITY_MAX);
+
     // Sampled in polar form so the offset lands uniformly on a disc of radius 1. Drawing x and y
     // independently would over-represent the corners of a square and let the magnitude reach sqrt(2),
     // which would in turn make Formation::GetMaxDistance() understate how far the bot may stand.
@@ -72,6 +76,14 @@ BotPersonality BotPersonality::FromSeed(uint32_t seed, float strength)
     }
 
     p.slotBias = Mix(seed ^ 0x5BF03635u);
+
+    // Scaled by strength so PersonalityStrength=0 leaves every bot ambitionless, and capped at the
+    // full share so an exaggerated strength does not give literally everyone a goal.
+    float const ambitionShare = AMBITION_SHARE * std::min(1.0f, strength);
+    if (Unit(seed, 7) < ambitionShare)
+    {
+        p.ambition = Unit(seed, 8) < AMBITION_SET_SHARE ? BotAmbitionKind::Set : BotAmbitionKind::Item;
+    }
 
     return p;
 }

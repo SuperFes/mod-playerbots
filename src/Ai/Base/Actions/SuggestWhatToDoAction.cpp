@@ -13,9 +13,15 @@
 #include "AiFactory.h"
 #include "ChatHelper.h"
 #include "Playerbots.h"
+#include "AmbitionMgr.h"
+#include "DBCStores.h"
 
 // Was urand(300, 600) plus up to 300s of jitter - 5 to 15 minutes per bot, which read as silence.
 // PlayerbotAI::SocialCooldown scales these by the bot's chattiness and AiPlayerbot.SocialCooldownScale.
+// An ambition is a long arc; mentioning it every few minutes would spoil it.
+static constexpr uint32 AMBITION_COOLDOWN_MIN = 900;
+static constexpr uint32 AMBITION_COOLDOWN_MAX = 2400;
+
 static constexpr uint32 SUGGEST_COOLDOWN_MIN = 90;
 static constexpr uint32 SUGGEST_COOLDOWN_MAX = 240;
 #include "BroadcastHelper.h"
@@ -386,5 +392,69 @@ bool SuggestTradeAction::Execute(Event /*event*/)
         return false;
 
     BroadcastHelper::BroadcastSuggestSell(botAI, proto, count, price, bot);
+    return true;
+}
+
+bool MentionAmbitionAction::isUseful()
+{
+    if (!sPlayerbotAIConfig.botAmbitions)
+        return false;
+
+    if (botAI->GetPersonality().ambition == BotAmbitionKind::None)
+        return false;
+
+    std::string const qualifier = "mention ambition";
+    return time(nullptr) >= AI_VALUE2(time_t, "last said", qualifier);
+}
+
+bool MentionAmbitionAction::Execute(Event /*event*/)
+{
+    BotAmbition const ambition = sAmbitionMgr->ResolveFor(bot);
+
+    std::map<std::string, std::string> placeholders;
+    std::string key;
+
+    if (ambition.IsSet())
+    {
+        ItemSetEntry const* set = sItemSetStore.LookupEntry(ambition.setId);
+        if (!set)
+            return false;
+
+        uint32 const owned = AmbitionMgr::CountSetPiecesOwned(bot, ambition.setId);
+        uint32 const total = AmbitionMgr::CountSetPiecesTotal(ambition.setId);
+
+        placeholders["%set_name"] = set->name[sWorld->GetDefaultDbcLocale()];
+        placeholders["%owned"] = std::to_string(owned);
+        placeholders["%total"] = std::to_string(total);
+
+        key = owned ? "ambition_set_progress" : "ambition_set";
+    }
+    else if (ambition.IsItem())
+    {
+        ItemTemplate const* proto = sObjectMgr->GetItemTemplate(ambition.itemId);
+        if (!proto)
+            return false;
+
+        placeholders["%item_link"] = chat->FormatItem(proto);
+
+        std::string const location = sAmbitionMgr->DescribeLocation(ambition);
+        if (!location.empty())
+        {
+            placeholders["%location"] = location;
+            placeholders["%source_name"] = ambition.sourceName;
+            key = "ambition_item_located";
+        }
+        else
+            key = "ambition_item";
+    }
+    else
+        return false;
+
+    botAI->TellMaster(PlayerbotTextMgr::instance().GetBotTextOrDefault(key, "", placeholders));
+
+    std::string const qualifier = "mention ambition";
+    botAI->GetAiObjectContext()->GetValue<time_t>("last said", qualifier)
+        ->Set(time(nullptr) + botAI->SocialCooldown(AMBITION_COOLDOWN_MIN, AMBITION_COOLDOWN_MAX));
+
     return true;
 }

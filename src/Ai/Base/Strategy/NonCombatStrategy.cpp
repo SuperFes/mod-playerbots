@@ -6,6 +6,8 @@
 
 #include "NonCombatStrategy.h"
 
+#include "PlayerbotAIConfig.h"
+
 void NonCombatStrategy::InitTriggers(std::vector<TriggerNode*>& triggers)
 {
     triggers.push_back(new TriggerNode("random", { NextAction("clean quest log", 1.0f) }));
@@ -28,12 +30,22 @@ void MountStrategy::InitTriggers(std::vector<TriggerNode*>& /*triggers*/)
 
 void TradeskillStrategy::InitTriggers(std::vector<TriggerNode*>& triggers)
 {
+    if (!sPlayerbotAIConfig.tradeskillWhenIdle && !sPlayerbotAIConfig.idleSit)
+        return;
+
     // Low relevance throughout: anything the bot could be doing instead should win. These only get a
     // tick because nothing else wanted one.
-    triggers.push_back(new TriggerNode("bot idle", { NextAction("craft random item", 1.2f) }));
-    triggers.push_back(new TriggerNode("bot idle", { NextAction("use random recipe", 1.1f) }));
-    triggers.push_back(new TriggerNode("bot idle", { NextAction("enchant random item", 1.0f) }));
-    triggers.push_back(new TriggerNode("bot idle", { NextAction("disenchant random item", 0.9f) }));
+    if (sPlayerbotAIConfig.tradeskillWhenIdle)
+    {
+        triggers.push_back(new TriggerNode("bot idle", { NextAction("craft random item", 1.2f) }));
+        triggers.push_back(new TriggerNode("bot idle", { NextAction("use random recipe", 1.1f) }));
+        triggers.push_back(new TriggerNode("bot idle", { NextAction("enchant random item", 1.0f) }));
+        triggers.push_back(new TriggerNode("bot idle", { NextAction("disenchant random item", 0.9f) }));
+    }
+
+    // Last resort: nothing to craft, nothing to do, so sit down like a person would.
+    if (sPlayerbotAIConfig.idleSit)
+        triggers.push_back(new TriggerNode("bot idle", { NextAction("idle sit", 0.5f) }));
 }
 
 void WorldBuffStrategy::InitTriggers(std::vector<TriggerNode*>& triggers)

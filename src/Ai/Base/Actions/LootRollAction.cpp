@@ -8,6 +8,7 @@
 
 #include "Event.h"
 #include "Group.h"
+#include "ItemDesire.h"
 #include "ItemUsageValue.h"
 #include "LootAction.h"
 #include "ObjectMgr.h"
@@ -95,6 +96,10 @@ bool LootRollAction::Execute(Event /*event*/)
                 vote = GREED;
             else if (sPlayerbotAIConfig.randomBotEmote && botAI->RollSocial(2))
                 bot->HandleEmoteCommand(EMOTE_ONESHOT_POINT);
+
+            // Five bots all rolling NEED on the same drop is the least human thing a group does.
+            if (vote == NEED && ShouldDeferToGroupmate(group, proto, randomProperty))
+                vote = sPlayerbotAIConfig.lootGreedRollLevel ? GREED : PASS;
         }
         else if (vote == GREED && !sPlayerbotAIConfig.lootGreedRollLevel)
             vote = PASS;
@@ -148,6 +153,58 @@ RollVote LootRollAction::CalculateRollVote(ItemTemplate const* proto, ItemUsage 
     }
 
     return StoreLootAction::IsLootAllowed(proto->ItemId, GET_PLAYERBOT_AI(bot)) ? needVote : PASS;
+}
+
+bool LootRollAction::ShouldDeferToGroupmate(Group* group, ItemTemplate const* proto, int32 randomPropertyId)
+{
+    if (!group || !proto || !sPlayerbotAIConfig.lootCourtesy)
+        return false;
+
+    float const myDesire = ItemDesire::Calculate(bot, proto, randomPropertyId);
+    if (myDesire <= 0.0f)
+        return false;
+
+    float bestOtherDesire = 0.0f;
+    Player* bestOther = nullptr;
+
+    for (GroupReference* ref = group->GetFirstMember(); ref; ref = ref->next())
+    {
+        Player* member = ref->GetSource();
+        if (!member || member == bot)
+            continue;
+
+        // Never defer to a real player - they roll for themselves and may want it for any reason.
+        if (!GET_PLAYERBOT_AI(member))
+            continue;
+
+        float const theirDesire = ItemDesire::Calculate(member, proto, randomPropertyId);
+        if (theirDesire > bestOtherDesire)
+        {
+            bestOtherDesire = theirDesire;
+            bestOther = member;
+        }
+    }
+
+    if (!bestOther)
+        return false;
+
+    // A generous bot steps aside on a smaller margin; a selfish one needs to be clearly outmatched.
+    float const margin =
+        sPlayerbotAIConfig.lootCourtesyMargin / std::max(0.1f, botAI->GetPersonality().generosity);
+    if (bestOtherDesire <= myDesire * margin)
+        return false;
+
+    if (botAI->RollSocial(2))
+    {
+        std::map<std::string, std::string> placeholders;
+        placeholders["%item_link"] = botAI->GetChatHelper()->FormatItem(proto);
+        placeholders["%other_name"] = bestOther->GetName();
+
+        botAI->TellMaster(PlayerbotTextMgr::instance().GetBotTextOrDefault(
+            "loot_defer_to_groupmate", "%other_name needs %item_link more than I do.", placeholders));
+    }
+
+    return true;
 }
 
 bool MasterLootRollAction::isUseful() { return !botAI->HasActivePlayerMaster(); }

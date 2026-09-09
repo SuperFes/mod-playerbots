@@ -37,6 +37,17 @@ private:
     const int32_t _dbc_locale;
 };
 
+// A bot saying what it is working towards. Only bots whose personality gave them an ambition have
+// anything to say here, so most of the group stays quiet.
+class MentionAmbitionAction : public SuggestWhatToDoAction
+{
+public:
+    MentionAmbitionAction(PlayerbotAI* botAI) : SuggestWhatToDoAction(botAI, "mention ambition") {}
+
+    bool isUseful() override;
+    bool Execute(Event event) override;
+};
+
 class SuggestTradeAction : public SuggestWhatToDoAction
 {
 public:

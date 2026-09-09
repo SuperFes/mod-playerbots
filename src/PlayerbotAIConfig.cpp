@@ -9,6 +9,7 @@
 
 #include "BotPersonality.h"
 #include <iostream>
+#include "AmbitionMgr.h"
 #include "BisListMgr.h"
 #include "Config.h"
 #include "NewRpgInfo.h"
@@ -120,6 +121,18 @@ bool PlayerbotAIConfig::Initialize()
         std::max(0.05f, sConfigMgr->GetOption<float>("AiPlayerbot.SocialCooldownScale", 1.0f));
 
     tradeskillIdleSeconds = sConfigMgr->GetOption<uint32>("AiPlayerbot.TradeskillIdleSeconds", 30);
+    tradeskillWhenIdle = sConfigMgr->GetOption<bool>("AiPlayerbot.TradeskillWhenIdle", true);
+    idleSit = sConfigMgr->GetOption<bool>("AiPlayerbot.IdleSit", true);
+
+    lootCourtesy = sConfigMgr->GetOption<bool>("AiPlayerbot.LootCourtesy", true);
+    // Below 1.0 a bot would defer to someone who wants it less, so clamp.
+    lootCourtesyMargin = std::max(1.0f, sConfigMgr->GetOption<float>("AiPlayerbot.LootCourtesyMargin", 1.25f));
+    lootDesireSetBonus = std::max(0.0f, sConfigMgr->GetOption<float>("AiPlayerbot.LootDesireSetBonus", 0.08f));
+    lootDesireBisBonus = std::max(0.0f, sConfigMgr->GetOption<float>("AiPlayerbot.LootDesireBisBonus", 0.35f));
+    lootDesireAmbitionBonus =
+        std::max(0.0f, sConfigMgr->GetOption<float>("AiPlayerbot.LootDesireAmbitionBonus", 0.80f));
+
+    botAmbitions = sConfigMgr->GetOption<bool>("AiPlayerbot.BotAmbitions", true);
 
     criticalHealth = sConfigMgr->GetOption<int32>("AiPlayerbot.CriticalHealth", 25);
     lowHealth = sConfigMgr->GetOption<int32>("AiPlayerbot.LowHealth", 45);
@@ -760,6 +773,7 @@ bool PlayerbotAIConfig::Initialize()
     sRandomItemMgr.Init();
     sRandomItemMgr.InitAfterAhBot();
     sBisListMgr->LoadAll();
+    sAmbitionMgr->LoadAll();
     PlayerbotTextMgr::instance().LoadBotTexts();
     PlayerbotTextMgr::instance().LoadBotTextChance();
     PlayerbotFactory::Init();

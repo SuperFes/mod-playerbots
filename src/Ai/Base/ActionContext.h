@@ -135,6 +135,7 @@ public:
         creators["flee to group leader"] = &ActionContext::flee_to_group_leader;
         creators["runaway"] = &ActionContext::runaway;
         creators["stay"] = &ActionContext::stay;
+        creators["idle sit"] = &ActionContext::idle_sit;
         creators["sit"] = &ActionContext::sit;
         creators["aggressive target"] = &ActionContext::aggressive_target;
         creators["attack anything"] = &ActionContext::attack_anything;
@@ -142,6 +143,7 @@ public:
         creators["attack enemy player"] = &ActionContext::attack_enemy_player;
         creators["emote"] = &ActionContext::emote;
         creators["talk"] = &ActionContext::talk;
+        creators["mention ambition"] = &ActionContext::mention_ambition;
         creators["suggest what to do"] = &ActionContext::suggest_what_to_do;
         creators["suggest trade"] = &ActionContext::suggest_trade;
         creators["suggest dungeon"] = &ActionContext::suggest_dungeon;
@@ -338,6 +340,7 @@ private:
     static Action* emote(PlayerbotAI* botAI) { return new EmoteAction(botAI); }
     static Action* talk(PlayerbotAI* botAI) { return new TalkAction(botAI); }
     static Action* suggest_what_to_do(PlayerbotAI* botAI) { return new SuggestWhatToDoAction(botAI); }
+    static Action* mention_ambition(PlayerbotAI* botAI) { return new MentionAmbitionAction(botAI); }
     static Action* suggest_trade(PlayerbotAI* botAI) { return new SuggestTradeAction(botAI); }
     static Action* suggest_dungeon(PlayerbotAI* botAI) { return new SuggestDungeonAction(botAI); }
     static Action* aggressive_target(PlayerbotAI* botAI) { return new AggressiveTargetAction(botAI); }
@@ -345,6 +348,7 @@ private:
     static Action* attack_least_hp_target(PlayerbotAI* botAI) { return new AttackLeastHpTargetAction(botAI); }
     static Action* attack_enemy_player(PlayerbotAI* botAI) { return new AttackEnemyPlayerAction(botAI); }
     static Action* stay(PlayerbotAI* botAI) { return new StayAction(botAI); }
+    static Action* idle_sit(PlayerbotAI* botAI) { return new IdleSitAction(botAI); }
     static Action* sit(PlayerbotAI* botAI) { return new SitAction(botAI); }
     static Action* runaway(PlayerbotAI* botAI) { return new RunAwayAction(botAI); }
     static Action* follow(PlayerbotAI* botAI) { return new FollowAction(botAI); }

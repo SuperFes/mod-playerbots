@@ -72,3 +72,27 @@ bool SitAction::Execute(Event /*event*/)
 }
 
 bool SitAction::isUseful() { return !AI_VALUE2(bool, "moving", "self target"); }
+
+bool IdleSitAction::isUseful()
+{
+    if (!sPlayerbotAIConfig.idleSit)
+        return false;
+
+    if (bot->IsInCombat() || botAI->GetState() == BOT_STATE_COMBAT || bot->isMoving() || bot->IsMounted())
+        return false;
+
+    if (bot->IsSitState() || bot->IsInFlight() || bot->getStandState() != UNIT_STAND_STATE_STAND)
+        return false;
+
+    // Only once the group has genuinely settled - the same signal the tradeskill work uses.
+    return botAI->GetIdleSeconds() >= sPlayerbotAIConfig.tradeskillIdleSeconds;
+}
+
+bool IdleSitAction::Execute(Event /*event*/)
+{
+    bot->SetStandState(UNIT_STAND_STATE_SIT);
+
+    // Nothing else to do, so do not hold a tick: the bot stands again through the normal movement
+    // path the moment anything wants it to move.
+    return true;
+}

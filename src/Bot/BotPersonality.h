@@ -17,6 +17,15 @@
 // "every bot individually metronomic"; call sites that model an action a person performs repeatedly
 // re-roll around the trait via ApplyJitter(). Spatial traits (personal space, slot bias) are used
 // directly - a habitual standing spot that jitters per tick is noise, not character.
+// What, if anything, a bot is working towards. Most of the interest is in NONE being common: if
+// every bot is chasing something the whole idea stops being a character trait.
+enum class BotAmbitionKind : uint8_t
+{
+    None = 0,   // content with what it has
+    Item,       // one specific upgrade it keeps an eye out for
+    Set         // a whole tier set, which is a much longer arc
+};
+
 struct BotPersonality
 {
     // Hard bounds. Traits are clamped here after strength scaling so an exaggerated
@@ -27,6 +36,8 @@ struct BotPersonality
     static constexpr float DISMOUNT_MAX = 2.00f;
     static constexpr float SOCIAL_MIN = 0.05f;
     static constexpr float SOCIAL_MAX = 6.00f;
+    static constexpr float GENEROSITY_MIN = 0.20f;
+    static constexpr float GENEROSITY_MAX = 4.00f;
     static constexpr float SPACE_MAX = 2.00f;
 
     // Sampled bands at strength 1.0.
@@ -36,12 +47,19 @@ struct BotPersonality
     static constexpr float DISMOUNT_BAND_HIGH = 1.35f;
     static constexpr float SOCIAL_BAND_LOW = 0.15f;
     static constexpr float SOCIAL_BAND_HIGH = 3.00f;
+    static constexpr float GENEROSITY_BAND_LOW = 0.50f;
+    static constexpr float GENEROSITY_BAND_HIGH = 1.80f;
 
     // Per-decision re-roll widths, applied by call sites through ApplyJitter().
     static constexpr float REACTION_JITTER = 0.15f;
     static constexpr float DISMOUNT_JITTER = 0.10f;
 
     static constexpr float STRENGTH_MAX = 2.0f;
+
+    // Share of bots with any ambition at strength 1, and the share of those chasing a whole set
+    // rather than a single item. At strength 0 nobody has one, matching every other trait.
+    static constexpr float AMBITION_SHARE = 0.65f;
+    static constexpr float AMBITION_SET_SHARE = 0.35f;
 
     // Builds the traits for a bot. `seed` is the bot's GUID counter; `strength` scales every trait
     // away from neutral, so 0 reproduces uniform bots exactly and values above 1 exaggerate.
@@ -56,7 +74,9 @@ struct BotPersonality
     float personalSpaceY = 0.0f;  // ...sampled on a disc so magnitude never exceeds 1
     float dismountSlack = 1.0f;   // multiplies the keep-mounted range
     float socialScale = 1.0f;     // multiplies emote/talk frequency; <1 is a quiet bot
+    float generosity = 1.0f;      // >1 defers loot to a groupmate on a smaller margin
     uint32_t slotBias = 0;        // stable tie-break for formation slot ordering
+    BotAmbitionKind ambition = BotAmbitionKind::None;
 };
 
 #endif

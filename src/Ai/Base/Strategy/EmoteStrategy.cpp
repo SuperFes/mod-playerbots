@@ -24,8 +24,8 @@ void EmoteStrategy::InitTriggers(std::vector<TriggerNode*>& triggers)
     {
         triggers.push_back(new TriggerNode(
             "sometimes",
-            { NextAction("suggest what to do", 10.0f), NextAction("suggest dungeon", 3.0f),
-                              NextAction("suggest trade", 3.0f) }));
+            { NextAction("suggest what to do", 10.0f), NextAction("mention ambition", 5.0f),
+                              NextAction("suggest dungeon", 3.0f), NextAction("suggest trade", 3.0f) }));
     }
 
     if (sPlayerbotAIConfig.enableGreet)
