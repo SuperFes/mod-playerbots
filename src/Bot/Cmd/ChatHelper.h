@@ -44,6 +44,7 @@ public:
     static std::string parseValue(const std::string& type, const std::string& text);
 
     static std::string const FormatQuest(Quest const* quest);
+    static std::string const FormatQuestCannotTakeReason(Player* bot, Quest const* quest);
     static std::string const FormatItem(ItemTemplate const* proto, uint32 count = 0, uint32 total = 0);
     static std::string const FormatQItem(uint32 itemId);
     static std::string const FormatSpell(SpellInfo const* spellInfo);

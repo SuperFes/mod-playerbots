@@ -8,6 +8,7 @@
 
 #include "AiFactory.h"
 #include "Common.h"
+#include "DBCStores.h"
 #include "ItemTemplate.h"
 #include "ObjectMgr.h"
 #include "Playerbots.h"
@@ -371,6 +372,99 @@ std::string const ChatHelper::FormatQuest(Quest const* quest)
 
     out << "|cFFFFFF00|Hquest:" << quest->GetQuestId() << ':' << quest->GetQuestLevel() << "|h[" << questTitle << "]|h|r";
     return out.str();
+}
+
+std::string const ChatHelper::FormatQuestCannotTakeReason(Player* bot, Quest const* quest)
+{
+    if (!bot || !quest)
+        return "Invalid quest or player";
+
+    uint32 questId = quest->GetQuestId();
+
+    if (bot->GetQuestStatus(questId) == QUEST_STATUS_COMPLETE)
+        return "Already completed this quest";
+
+    if (!bot->SatisfyQuestStatus(quest, false))
+        return "Already have this quest in quest log";
+
+    if (!bot->SatisfyQuestLog(false))
+        return "Quest log is full (25/25)";
+
+    if (bot->GetLevel() < quest->GetMinLevel())
+    {
+        std::ostringstream ss;
+        ss << "Level too low (requires level " << quest->GetMinLevel() << ", I am level " << bot->GetLevel() << ")";
+        return ss.str();
+    }
+
+    if (quest->GetMaxLevel() > 0 && bot->GetLevel() > quest->GetMaxLevel())
+    {
+        std::ostringstream ss;
+        ss << "Level too high (max level " << quest->GetMaxLevel() << ", I am level " << bot->GetLevel() << ")";
+        return ss.str();
+    }
+
+    if (!bot->SatisfyQuestRace(quest, false))
+        return "Wrong race";
+
+    if (!bot->SatisfyQuestClass(quest, false))
+        return "Wrong class";
+
+    if (!bot->SatisfyQuestPreviousQuest(quest, false) || !bot->SatisfyQuestPrevChain(quest, false))
+    {
+        if (quest->GetPrevQuestId() > 0 && !bot->IsQuestRewarded(quest->GetPrevQuestId()))
+        {
+            if (Quest const* prev = sObjectMgr->GetQuestTemplate(quest->GetPrevQuestId()))
+                return "Missing prerequisite quest: " + FormatQuest(prev);
+        }
+
+        for (int32 prevIdRaw : quest->prevQuests)
+        {
+            uint32 prevId = std::abs(prevIdRaw);
+            if (prevIdRaw > 0 && !bot->IsQuestRewarded(prevId))
+            {
+                if (Quest const* prev = sObjectMgr->GetQuestTemplate(prevId))
+                    return "Missing prerequisite quest: " + FormatQuest(prev);
+            }
+        }
+        return "Missing prerequisite quest in chain";
+    }
+
+    if (!bot->SatisfyQuestSkill(quest, false))
+    {
+        if (quest->GetRequiredSkill() > 0)
+        {
+            SkillLineEntry const* skillEntry = sSkillLineStore.LookupEntry(quest->GetRequiredSkill());
+            std::string skillName = skillEntry ? skillEntry->name[sWorld->GetDefaultDbcLocale()] : "Required skill";
+            std::ostringstream ss;
+            ss << "Skill requirement not met (" << skillName << " " << quest->GetRequiredSkillValue() << ")";
+            return ss.str();
+        }
+        return "Required profession or skill level not met";
+    }
+
+    if (!bot->SatisfyQuestReputation(quest, false))
+        return "Required faction reputation not met";
+
+    if (!bot->SatisfyQuestExclusiveGroup(quest, false))
+        return "Mutually exclusive quest already active or completed";
+
+    if (!bot->SatisfyQuestDay(quest, false))
+        return "Daily quest limit (25) reached";
+
+    if (!bot->SatisfyQuestWeek(quest, false))
+        return "Weekly quest already completed";
+
+    if (!bot->SatisfyQuestSeasonal(quest, false))
+        return "Seasonal event is not active";
+
+    if (!bot->CanAddQuest(quest, false))
+        return "Bags are full for required quest items";
+
+    if (!bot->SatisfyQuestConditions(quest, false))
+        return "Quest conditions not met";
+
+    return "Cannot take quest (requirements not met)";
 }
 
 std::string const ChatHelper::FormatGameobject(GameObject* go)

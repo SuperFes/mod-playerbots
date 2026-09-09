@@ -184,6 +184,11 @@ bool UseItemAction::UseItem(Item* item, ObjectGuid goGuid, Item* itemTarget, Uni
         }
     }
 
+    // Don't drop out of formation for an item while the group is on the move; the use is
+    // retried once the master stops.
+    if (bot->isMoving() && botAI->IsTravellingWithMaster())
+        return false;
+
     bot->ClearUnitState(UNIT_STATE_CHASE);
     bot->ClearUnitState(UNIT_STATE_FOLLOW);
 
@@ -294,11 +299,8 @@ bool UseItemAction::UseItem(Item* item, ObjectGuid goGuid, Item* itemTarget, Uni
             TellConsumableUse(item, "Eating", p);
         }
 
-        if (!bot->IsInCombat() && !bot->InBattleground())
-            botAI->SetNextCheckDelay(std::max(10000.0f, 27000.0f * (100 - p) / 100.0f));
-
-        if (!bot->IsInCombat() && bot->InBattleground())
-            botAI->SetNextCheckDelay(std::max(10000.0f, 20000.0f * (100 - p) / 100.0f));
+        if (!bot->IsInCombat())
+            botAI->SetNextCheckDelay(sPlayerbotAIConfig.reactDelay);
 
         // botAI->SetNextCheckDelay(27000.0f * (100 - p) / 100.0f);
         //  botAI->SetNextCheckDelay(20000);
@@ -396,7 +398,16 @@ bool UseItemAction::SocketItem(Item* item, Item* gem, bool replace)
 
 bool UseItemAction::isPossible() { return getName() == "use" || AI_VALUE2(uint32, "item count", getName()) > 0; }
 
-bool UseSpellItemAction::isUseful() { return AI_VALUE2(bool, "spell cast useful", getName()); }
+bool UseSpellItemAction::isUseful()
+{
+    // Spell::CheckCast rejects any non-passive cast from a mounted player with
+    // SPELL_FAILED_NOT_MOUNTED, and UseItemAction never checks the result, so retrying
+    // here just repeats every tick.
+    if (bot->IsMounted())
+        return false;
+
+    return AI_VALUE2(bool, "spell cast useful", getName());
+}
 
 bool UseHealingPotion::isUseful() { return AI_VALUE2(bool, "combat", "self target"); }
 

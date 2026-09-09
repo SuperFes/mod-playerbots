@@ -755,6 +755,16 @@ std::string const PlayerbotHolder::ProcessBotCommand(std::string const cmd, Obje
         // If the bot is currently online as a playerbot, log it out cleanly first
         if (Player* bot = GetPlayerBot(guid))
         {
+            // Synchronously remove the bot from its group before destroying its session.
+            // LogoutPlayerBot only queues an async BotLogoutGroupCleanupOperation which
+            // saves state but never calls RemoveMember. Without this, the group member
+            // slot stays occupied until the world-thread processes the queue, which blocks
+            // any immediately-following ".bot add" from joining the now-open slot.
+            if (Group* group = bot->GetGroup())
+            {
+                if (!bot->InBattleground() && !bot->InBattlegroundQueue())
+                    group->RemoveMember(guid);
+            }
             LogoutPlayerBot(guid);
         }
         else if (Player* bot = ObjectAccessor::FindPlayer(guid))

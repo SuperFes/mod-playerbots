@@ -119,7 +119,7 @@ bool TogglePetSpellAutoCastAction::Execute(Event /*event*/)
     if (toggled && sPlayerbotAIConfig.petChatCommandDebug == 1)
         botAI->TellMaster("Pet autocast spells have been toggled.");
 
-    return toggled;
+    return true;
 }
 
 bool PetAttackAction::Execute(Event /*event*/)

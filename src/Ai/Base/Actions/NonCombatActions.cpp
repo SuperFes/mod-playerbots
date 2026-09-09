@@ -53,17 +53,7 @@ bool DrinkAction::Execute(Event event)
         bot->SetStandState(UNIT_STAND_STATE_SIT);
         botAI->InterruptSpell();
 
-        // float hp = bot->GetHealthPercent();
-        float mp = bot->GetPowerPct(POWER_MANA);
-        float p = mp;
-        float delay;
-
-        if (!bot->InBattleground())
-            delay = 18000.0f * (100 - p) / 100.0f;
-        else
-            delay = 12000.0f * (100 - p) / 100.0f;
-
-        botAI->SetNextCheckDelay(delay);
+        botAI->SetNextCheckDelay(sPlayerbotAIConfig.reactDelay);
 
         bot->AddAura(25990, bot);
         return true;
@@ -79,6 +69,11 @@ bool DrinkAction::Execute(Event event)
 
 bool DrinkAction::isUseful()
 {
+    // Sitting to drink clears UNIT_STATE_FOLLOW and stops the bot dead; never do it while
+    // the group is on the move.
+    if (botAI->IsTravellingWithMaster())
+        return false;
+
     return UseItemAction::isUseful() && AI_VALUE2(bool, "has mana", "self target") &&
            AI_VALUE2(uint8, "mana", "self target") < 100;
 }
@@ -117,17 +112,7 @@ bool EatAction::Execute(Event event)
         bot->SetStandState(UNIT_STAND_STATE_SIT);
         botAI->InterruptSpell();
 
-        float hp = bot->GetHealthPct();
-        // float mp = bot->HasMana() ? bot->GetPowerPercent() : 0.f;
-        float p = hp;
-        float delay;
-
-        if (!bot->InBattleground())
-            delay = 18000.0f * (100 - p) / 100.0f;
-        else
-            delay = 12000.0f * (100 - p) / 100.0f;
-
-        botAI->SetNextCheckDelay(delay);
+        botAI->SetNextCheckDelay(sPlayerbotAIConfig.reactDelay);
 
         bot->AddAura(25990, bot);
         return true;
@@ -140,7 +125,14 @@ bool EatAction::Execute(Event event)
     return UseItemAction::Execute(event);
 }
 
-bool EatAction::isUseful() { return UseItemAction::isUseful() && AI_VALUE2(uint8, "health", "self target") < 100; }
+bool EatAction::isUseful()
+{
+    // Same as DrinkAction: eating sits the bot down and drops it out of formation.
+    if (botAI->IsTravellingWithMaster())
+        return false;
+
+    return UseItemAction::isUseful() && AI_VALUE2(uint8, "health", "self target") < 100;
+}
 
 bool EatAction::isPossible()
 {

@@ -72,27 +72,14 @@ public:
 
     T Get() override
     {
-        if (checkInterval < 2)
+        time_t now = getMSTime();
+        if (lastCheckTime && (checkInterval < 2 ? (now == lastCheckTime) : (now - lastCheckTime < checkInterval)))
         {
-            // PerfMonitorOperation* pmo = sPerfMonitor.start(PERF_MON_VALUE, this->getName(),
-            // this->context ? &this->context->performanceStack : nullptr);
-            value = Calculate();
-            // if (pmo)
-            //     pmo->finish();
+            return value;
         }
-        else
-        {
-            time_t now = getMSTime();
-            if (!lastCheckTime || now - lastCheckTime >= checkInterval)
-            {
-                lastCheckTime = now;
-                // PerfMonitorOperation* pmo = sPerfMonitor.start(PERF_MON_VALUE, this->getName(),
-                // this->context ? &this->context->performanceStack : nullptr);
-                value = Calculate();
-                // if (pmo)
-                //     pmo->finish();
-            }
-        }
+
+        lastCheckTime = now;
+        value = Calculate();
         return value;
     }
 
@@ -105,27 +92,14 @@ public:
     }
     T& RefGet() override
     {
-        if (checkInterval < 2)
+        time_t now = getMSTime();
+        if (lastCheckTime && (checkInterval < 2 ? (now == lastCheckTime) : (now - lastCheckTime < checkInterval)))
         {
-            // PerfMonitorOperation* pmo = sPerfMonitor.start(PERF_MON_VALUE, this->getName(),
-            // this->context ? &this->context->performanceStack : nullptr);
-            value = Calculate();
-            // if (pmo)
-            //     pmo->finish();
+            return value;
         }
-        else
-        {
-            time_t now = getMSTime();
-            if (!lastCheckTime || now - lastCheckTime >= checkInterval)
-            {
-                lastCheckTime = now;
-                // PerfMonitorOperation* pmo = sPerfMonitor.start(PERF_MON_VALUE, this->getName(),
-                // this->context ? &this->context->performanceStack : nullptr);
-                value = Calculate();
-                // if (pmo)
-                //     pmo->finish();
-            }
-        }
+
+        lastCheckTime = now;
+        value = Calculate();
         return value;
     }
     void Set(T val) override { value = val; }

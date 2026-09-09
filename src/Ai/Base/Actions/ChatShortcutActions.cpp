@@ -11,6 +11,7 @@
 #include "PlayerbotTextMgr.h"
 #include "Playerbots.h"
 #include "PositionValue.h"
+#include "ServerFacade.h"
 
 static std::map<std::string, std::string> GetDefaultPlaceholders(PlayerbotAI* botAI, Player* bot, Player* master)
 {
@@ -111,7 +112,7 @@ bool FollowChatShortcutAction::Execute(Event /*event*/)
         if (bot->GetPet())
             botAI->PetFollow();
 
-        if (moved)
+        if (moved && ServerFacade::instance().IsDistanceLessOrEqualThan(bot->GetDistance(master), sPlayerbotAIConfig.farDistance))
         {
             botAI->TellMaster(PlayerbotTextMgr::instance().GetBotTextOrDefault(
                 "following", "Following", GetDefaultPlaceholders(botAI, bot, master)));
@@ -119,23 +120,20 @@ bool FollowChatShortcutAction::Execute(Event /*event*/)
         }
     }
 
-    /* Default mechanics takes care of this now.
-    if (bot->GetMapId() != master->GetMapId() || (master && bot->GetDistance(master) >
-    sPlayerbotAIConfig.sightDistance))
+    if (master)
     {
         if (bot->isDead())
         {
             bot->ResurrectPlayer(1.0f, false);
             botAI->TellMasterNoFacing("Back from the grave!");
         }
-        else
-            botAI->TellMaster("You are too far away from me! I will there soon.");
 
         bot->RemoveAurasWithInterruptFlags(AURA_INTERRUPT_FLAG_TELEPORTED | AURA_INTERRUPT_FLAG_CHANGE_MAP);
-        bot->TeleportTo(master->GetMapId(), master->GetPositionX(), master->GetPositionY(), master->GetPositionZ(),
-    master->GetOrientation()); return true;
+        bot->TeleportTo(master->GetMapId(), master->GetPositionX(), master->GetPositionY(), master->GetPositionZ(), master->GetOrientation());
+        botAI->TellMaster(PlayerbotTextMgr::instance().GetBotTextOrDefault(
+            "following", "Following", GetDefaultPlaceholders(botAI, bot, master)));
+        return true;
     }
-    */
 
     botAI->TellMaster(PlayerbotTextMgr::instance().GetBotTextOrDefault(
         "following", "Following", GetDefaultPlaceholders(botAI, bot, master)));

@@ -42,7 +42,7 @@ bool HunterAspectOfTheDragonhawkTrigger::IsActive()
         return false;
 
     if (botAI->HasAura("aspect of the viper", target))
-        return AI_VALUE2(uint8, "mana", "self target") >= 60;
+        return AI_VALUE2(uint8, "mana", "self target") >= 85;
 
     return true;
 }
@@ -90,7 +90,7 @@ bool HunterAspectOfTheViperTrigger::IsActive()
         return false;
 
     return BuffTrigger::IsActive() &&
-           AI_VALUE2(uint8, "mana", "self target") < (sPlayerbotAIConfig.lowMana / 2);
+           AI_VALUE2(uint8, "mana", "self target") < sPlayerbotAIConfig.lowMana;
 }
 
 bool HunterAspectOfThePackTrigger::IsActive()

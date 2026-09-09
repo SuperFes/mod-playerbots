@@ -220,19 +220,10 @@ bool QuestAction::AcceptQuest(Quest const* quest, ObjectGuid questGiver)
 
     uint32 questId = quest->GetQuestId();
 
-    if (bot->GetQuestStatus(questId) == QUEST_STATUS_COMPLETE)
-        out << "Already completed";
-    else if (!bot->CanTakeQuest(quest, false))
+    if (!bot->CanTakeQuest(quest, false) || !bot->CanAddQuest(quest, false) || bot->GetQuestStatus(questId) == QUEST_STATUS_COMPLETE)
     {
-        if (!bot->SatisfyQuestStatus(quest, false))
-            out << "Already on";
-        else
-            out << "Can't take";
+        out << ChatHelper::FormatQuestCannotTakeReason(bot, quest);
     }
-    else if (!bot->SatisfyQuestLog(false))
-        out << "Quest log is full";
-    else if (!bot->CanAddQuest(quest, false))
-        out << "Bags are full";
     else
     {
         WorldPacket p(CMSG_QUESTGIVER_ACCEPT_QUEST);

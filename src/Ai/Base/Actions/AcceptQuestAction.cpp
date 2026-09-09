@@ -111,7 +111,7 @@ bool AcceptQuestShareAction::Execute(Event event)
     p >> quest;
 
     Quest const* qInfo = sObjectMgr->GetQuestTemplate(quest);
-    if (!qInfo || !bot->GetDivider())
+    if (!qInfo)
         return false;
 
     quest = qInfo->GetQuestId();
@@ -119,18 +119,22 @@ bool AcceptQuestShareAction::Execute(Event event)
     if (bot->HasQuest(quest))
     {
         bot->SetDivider(ObjectGuid::Empty);
-        botAI->TellError(PlayerbotTextMgr::instance().GetBotTextOrDefault(
-            "quest_already_have_error", "I have this quest", {}));
+        botAI->TellError(ChatHelper::FormatQuest(qInfo) + ": I already have this quest");
         return false;
     }
 
-    if (!bot->CanTakeQuest(qInfo, false))
+    if (bot->GetQuestStatus(quest) == QUEST_STATUS_COMPLETE)
     {
-        // can't take quest
         bot->SetDivider(ObjectGuid::Empty);
-        botAI->TellError(PlayerbotTextMgr::instance().GetBotTextOrDefault(
-            "quest_cant_take_error", "I can't take this quest", {}));
+        botAI->TellError(ChatHelper::FormatQuest(qInfo) + ": I already completed this quest");
+        return false;
+    }
 
+    if (!bot->CanTakeQuest(qInfo, false) || !bot->CanAddQuest(qInfo, false))
+    {
+        bot->SetDivider(ObjectGuid::Empty);
+        std::string reason = ChatHelper::FormatQuestCannotTakeReason(bot, qInfo);
+        botAI->TellError(ChatHelper::FormatQuest(qInfo) + ": " + reason);
         return false;
     }
 
@@ -148,17 +152,14 @@ bool AcceptQuestShareAction::Execute(Event event)
         if (bot->CanCompleteQuest(quest))
             bot->CompleteQuest(quest);
 
-        // Runsttren: did not add typeid switch from WorldSession::HandleQuestgiverAcceptQuestOpcode!
-        // I think it's not needed, cause typeid should be TYPEID_PLAYER - and this one is not handled
-        // there and there is no default case also.
-
         if (qInfo->GetSrcSpell() > 0)
         {
             bot->CastSpell(bot, qInfo->GetSrcSpell(), true);
         }
 
-        botAI->TellMaster(PlayerbotTextMgr::instance().GetBotTextOrDefault(
-            "quest_accept", "Quest accepted", {}));
+        std::string text = PlayerbotTextMgr::instance().GetBotTextOrDefault(
+            "quest_accept", "Quest accepted", {});
+        botAI->TellMaster(ChatHelper::FormatQuest(qInfo) + ": " + text);
         return true;
     }
 
@@ -180,10 +181,10 @@ bool ConfirmQuestAction::Execute(Event event)
         return false;
 
     quest = qInfo->GetQuestId();
-    if (!bot->CanTakeQuest(qInfo, false))
+    if (!bot->CanTakeQuest(qInfo, false) || !bot->CanAddQuest(qInfo, false))
     {
-        // can't take quest
-        // botAI->TellError("quest_cant_take");
+        std::string reason = ChatHelper::FormatQuestCannotTakeReason(bot, qInfo);
+        botAI->TellError(ChatHelper::FormatQuest(qInfo) + ": " + reason);
         return false;
     }
 
@@ -199,7 +200,6 @@ bool ConfirmQuestAction::Execute(Event event)
             bot->CastSpell(bot, qInfo->GetSrcSpell(), true);
         }
 
-        // botAI->TellMaster("quest_accept");
         return true;
     }
 

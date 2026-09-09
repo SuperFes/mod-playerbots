@@ -12,6 +12,10 @@
 #include "Playerbots.h"
 #include "ReputationMgr.h"
 #include "ServerFacade.h"
+#include "Group.h"
+#include "ObjectAccessor.h"
+#include "Spell.h"
+#include "Pet.h"
 
 GuidVector AttackersValue::Calculate()
 {
@@ -103,6 +107,23 @@ void AttackersValue::AddAttackersOf(Player* player, std::unordered_set<Unit*>& t
             player->GetDistance2d(attacker) < sPlayerbotAIConfig.sightDistance)
             targets.insert(attacker);
     }
+
+    if (Pet* pet = player->GetPet())
+    {
+        if (pet->IsAlive())
+        {
+            for (auto const& [guid, ref] : pet->GetThreatMgr().GetThreatenedByMeList())
+            {
+                Unit* attacker = ref->GetOwner();
+                if (!attacker)
+                    continue;
+
+                if (pet->IsValidAttackTarget(attacker) &&
+                    pet->GetDistance2d(attacker) < sPlayerbotAIConfig.sightDistance)
+                    targets.insert(attacker);
+            }
+        }
+    }
 }
 
 void AttackersValue::RemoveNonThreating(std::unordered_set<Unit*>& targets)
@@ -136,6 +157,47 @@ bool AttackersValue::IsPossibleTarget(Unit* attacker, Player* bot, float /*range
 
     // Basic check
     if (!attacker)
+        return false;
+
+    // Check if target is being tamed by another player/bot
+    // Spell ID 1515 is Tame Beast.
+    bool beingTamedByOther = false;
+    if (Aura* aura = attacker->GetAura(1515))
+    {
+        if (aura->GetCasterGUID() != bot->GetGUID())
+            beingTamedByOther = true;
+    }
+
+    if (!beingTamedByOther)
+    {
+        Group* group = bot->GetGroup();
+        if (group)
+        {
+            Group::MemberSlotList const& slots = group->GetMemberSlots();
+            for (Group::MemberSlotList::const_iterator slot = slots.begin(); slot != slots.end(); ++slot)
+            {
+                if (slot->guid != bot->GetGUID())
+                {
+                    if (Player* member = ObjectAccessor::FindPlayer(slot->guid))
+                    {
+                        if (member->IsInWorld() && member->GetMapId() == bot->GetMapId())
+                        {
+                            if (Spell* spell = member->GetCurrentSpell(CURRENT_CHANNELED_SPELL))
+                            {
+                                if (spell->GetSpellInfo()->Id == 1515 && spell->m_targets.GetUnitTarget() == attacker)
+                                {
+                                    beingTamedByOther = true;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if (beingTamedByOther)
         return false;
 
     // bool inCannon = botAI->IsInVehicle(false, true);

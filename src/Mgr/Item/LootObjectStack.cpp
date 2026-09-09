@@ -11,6 +11,7 @@
 #include "ObjectAccessor.h"
 #include "Playerbots.h"
 #include "Unit.h"
+#include "Corpse.h"
 
 #define MAX_LOOT_OBJECT_COUNT 200
 
@@ -63,13 +64,24 @@ void LootObject::Refresh(Player* bot, ObjectGuid lootGUID)
     {
         return;
     }
+
+    // Check if it's the bot's own corpse
+    Corpse* playerCorpse = bot->GetCorpse();
+    if (playerCorpse && playerCorpse->GetGUID() == lootGUID)
+    {
+        guid = lootGUID;
+        return;
+    }
+
     Creature* creature = botAI->GetCreature(lootGUID);
     if (creature && creature->getDeathState() == DeathState::Corpse)
     {
         if (creature->HasFlag(UNIT_DYNAMIC_FLAGS, UNIT_DYNFLAG_LOOTABLE))
+        {
             guid = lootGUID;
-
-        if (creature->HasFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_SKINNABLE))
+            skillId = SKILL_NONE;
+        }
+        else if (creature->HasFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_SKINNABLE))
         {
             skillId = creature->GetCreatureTemplate()->GetRequiredLootSkill();
             uint32 targetLevel = creature->GetLevel();
@@ -259,6 +271,11 @@ WorldObject* LootObject::GetWorldObject(Player* bot)
     {
         return nullptr;
     }
+
+    Corpse* playerCorpse = bot->GetCorpse();
+    if (playerCorpse && playerCorpse->GetGUID() == guid)
+        return playerCorpse;
+
     Creature* creature = botAI->GetCreature(guid);
     if (creature && creature->getDeathState() == DeathState::Corpse && creature->IsInWorld())
         return creature;
@@ -292,8 +309,29 @@ bool LootObject::IsLootPossible(Player* bot)
     {
         return false;
     }
+
+    // Check if it's the bot's own corpse
+    Corpse* playerCorpse = bot->GetCorpse();
+    if (playerCorpse && playerCorpse->GetGUID() == guid)
+    {
+        if (abs(playerCorpse->GetPositionZ() - bot->GetPositionZ()) > INTERACTION_DISTANCE - 2.0f)
+            return false;
+        return true;
+    }
+
     if (reqItem && !bot->HasItemCount(reqItem, 1))
-        return false;
+    {
+        // If it's a lockpickable object and the bot is a rogue with enough lockpicking skill, allow it!
+        if (skillId == SKILL_LOCKPICKING && botAI->HasSkill(SKILL_LOCKPICKING) &&
+            (!reqSkillValue || bot->GetSkillValue(SKILL_LOCKPICKING) >= reqSkillValue))
+        {
+            // Lockpick bypasses physical key requirement
+        }
+        else
+        {
+            return false;
+        }
+    }
 
     if (abs(worldObj->GetPositionZ() - bot->GetPositionZ()) > INTERACTION_DISTANCE - 2.0f)
         return false;
@@ -301,8 +339,13 @@ bool LootObject::IsLootPossible(Player* bot)
     Creature* creature = botAI->GetCreature(guid);
     if (creature && creature->getDeathState() == DeathState::Corpse)
     {
-        if (!bot->isAllowedToLoot(creature) && skillId != SKILL_SKINNING)
-            return false;
+        if (skillId != SKILL_SKINNING)
+        {
+            if (creature->GetLootRecipientGroup() && creature->GetLootRecipientGroup() != bot->GetGroup())
+                return false;
+            if (!creature->GetLootRecipientGroup() && creature->GetLootRecipient() && creature->GetLootRecipient() != bot)
+                return false;
+        }
     }
 
     // Prevent bot from running to chests that are unlootable (e.g. Gunship Armory before completing the event) or on

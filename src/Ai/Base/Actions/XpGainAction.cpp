@@ -44,8 +44,10 @@ bool XpGainAction::Execute(Event event)
         {
             if (creature->IsDungeonBoss() || creature->isWorldBoss())
             {
+                // One-shot, not EMOTE_STATE_DANCE: state emotes loop until something resets
+                // them, which leaves an idle bot dancing indefinitely.
                 if (!urand(0, 3))
-                    bot->HandleEmoteCommand(EMOTE_STATE_DANCE);
+                    bot->HandleEmoteCommand(EMOTE_ONESHOT_DANCE);
                 else
                     bot->HandleEmoteCommand(EMOTE_ONESHOT_CHEER);
             }

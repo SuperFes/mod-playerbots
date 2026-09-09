@@ -51,7 +51,7 @@ protected:
     void SetNextMovementDelay(float delayMillis);
     bool IsMovingAllowed(WorldObject* target);
     bool IsDuplicateMove(float x, float y, float z);
-    bool IsWaitingForLastMove(MovementPriority priority);
+    bool IsWaitingForLastMove(MovementPriority priority, float x = 0.0f, float y = 0.0f, float z = 0.0f);
     bool IsMovingAllowed();
     bool Flee(Unit* target);
     void ClearIdleState();

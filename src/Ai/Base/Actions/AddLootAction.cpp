@@ -7,6 +7,7 @@
 #include "AddLootAction.h"
 
 #include "CellImpl.h"
+#include "Corpse.h"
 #include "Event.h"
 #include "GridNotifiers.h"
 #include "GridNotifiersImpl.h"
@@ -34,6 +35,16 @@ bool AddAllLootAction::Execute(Event /*event*/)
     GuidVector corpses = context->GetValue<GuidVector>("nearest corpses")->Get();
     for (GuidVector::iterator i = corpses.begin(); i != corpses.end(); i++)
         added |= AddLoot(*i);
+
+    // Add player's own corpse if it has loot (e.g. from tombstone/corpse recovery modules)
+    if (bot->IsAlive())
+    {
+        Corpse* playerCorpse = bot->GetCorpse();
+        if (playerCorpse && playerCorpse->IsInWorld() && playerCorpse->GetMapId() == bot->GetMapId())
+        {
+            added |= AddLoot(playerCorpse->GetGUID());
+        }
+    }
 
     return added;
 }

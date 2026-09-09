@@ -19,7 +19,7 @@ void UseFoodStrategy::InitTriggers(std::vector<TriggerNode*>& triggers)
     }
     else
     {
-        triggers.push_back(new TriggerNode("low health", { NextAction("food", 3.0f) }));
-        triggers.push_back(new TriggerNode("low mana", { NextAction("drink", 3.0f) }));
+        triggers.push_back(new TriggerNode("medium health", { NextAction("food", 3.0f) }));
+        triggers.push_back(new TriggerNode("medium mana", { NextAction("drink", 3.0f) }));
     }
 }

@@ -31,17 +31,38 @@ bool TaxiAction::Execute(Event event)
     }
 
     GuidVector units = *context->GetValue<GuidVector>("nearest npcs");
+    Creature* npc = nullptr;
     for (ObjectGuid const guid : units)
     {
-        Creature* npc = ObjectAccessor::GetCreature(*bot, guid);
-        if (!npc || !npc->IsAlive())
+        Creature* npcTemp = ObjectAccessor::GetCreature(*bot, guid);
+        if (!npcTemp || !npcTemp->IsAlive())
             continue;
 
-        if (!(npc->GetNpcFlags() & UNIT_NPC_FLAG_FLIGHTMASTER))
+        if (!(npcTemp->GetNpcFlags() & UNIT_NPC_FLAG_FLIGHTMASTER))
             continue;
 
-        if (bot->GetDistance(npc) > sPlayerbotAIConfig.farDistance)
-            continue;
+        if (bot->GetDistance(npcTemp) <= sPlayerbotAIConfig.farDistance)
+        {
+            npc = npcTemp;
+            break;
+        }
+    }
+
+    if (!npc && movement.taxiMaster)
+    {
+        Creature* npcTemp = ObjectAccessor::GetCreature(*bot, movement.taxiMaster);
+        if (npcTemp && npcTemp->IsAlive() && (npcTemp->GetNpcFlags() & UNIT_NPC_FLAG_FLIGHTMASTER))
+        {
+            npc = npcTemp;
+        }
+    }
+
+    if (npc)
+    {
+        if (bot->GetDistance(npc) > INTERACTION_DISTANCE + 2.0f)
+        {
+            bot->NearTeleportTo(npc->GetPositionX(), npc->GetPositionY(), npc->GetPositionZ(), npc->GetOrientation());
+        }
 
         bot->GetSession()->SendLearnNewTaxiNode(npc);
         uint32 curloc = sObjectMgr->GetNearestTaxiNode(npc->GetPositionX(), npc->GetPositionY(), npc->GetPositionZ(),

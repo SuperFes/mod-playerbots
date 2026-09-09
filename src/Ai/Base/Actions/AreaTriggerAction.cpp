@@ -26,7 +26,14 @@ bool ReachAreaTriggerAction::Execute(Event event)
     if (!at)
         return false;
 
-    if (!sObjectMgr->GetAreaTriggerTeleport(triggerId))
+    AreaTriggerTeleport const* atTeleport = sObjectMgr->GetAreaTriggerTeleport(triggerId);
+
+    // If this areatrigger has a teleport destination and bot is already on that destination map
+    // (e.g. from OnPlayerMapChanged), we have already arrived!
+    if (atTeleport && bot->GetMapId() == atTeleport->target_mapId)
+        return true;
+
+    if (!atTeleport)
     {
         WorldPacket p1(CMSG_AREATRIGGER);
         p1 << triggerId;
@@ -38,8 +45,23 @@ bool ReachAreaTriggerAction::Execute(Event event)
 
     if (bot->GetMapId() != at->map)
     {
-        botAI->TellError(PlayerbotTextMgr::instance().GetBotTextOrDefault(
-            "area_trigger_follow_too_far_error", "I won't follow: too far away", {}));
+        // If master is on the target map, bring the bot to master directly
+        Player* master = botAI->GetMaster();
+        if (master && master->GetMapId() == atTeleport->target_mapId)
+        {
+            bot->RemoveAurasWithInterruptFlags(AURA_INTERRUPT_FLAG_TELEPORTED | AURA_INTERRUPT_FLAG_CHANGE_MAP);
+            bot->TeleportTo(atTeleport->target_mapId, atTeleport->target_X, atTeleport->target_Y, atTeleport->target_Z, atTeleport->target_Orientation);
+            return true;
+        }
+
+        return true;
+    }
+
+    if (bot->IsInAreaTriggerRadius(at, 2.0f))
+    {
+        bot->RemoveAurasWithInterruptFlags(AURA_INTERRUPT_FLAG_TELEPORTED | AURA_INTERRUPT_FLAG_CHANGE_MAP);
+        bot->TeleportTo(atTeleport->target_mapId, atTeleport->target_X, atTeleport->target_Y, atTeleport->target_Z, atTeleport->target_Orientation);
+        botAI->TellMaster(PlayerbotTextMgr::instance().GetBotTextOrDefault("hello", "Hello", {}));
         return true;
     }
 
@@ -54,8 +76,6 @@ bool ReachAreaTriggerAction::Execute(Event event)
 
     float distance = bot->GetDistance(at->x, at->y, at->z);
     float delay = 1000.0f * distance / bot->GetSpeed(MOVE_RUN) + sPlayerbotAIConfig.reactDelay;
-    botAI->TellError(PlayerbotTextMgr::instance().GetBotTextOrDefault(
-        "area_trigger_wait_for_me", "Wait for me", {}));
     botAI->SetNextCheckDelay(delay);
     context->GetValue<LastMovement&>("last area trigger")->Get().lastAreaTrigger = triggerId;
 
@@ -72,8 +92,14 @@ bool AreaTriggerAction::Execute(Event /*event*/)
     if (!sObjectMgr->GetAreaTrigger(triggerId))
         return false;
 
-    if (!sObjectMgr->GetAreaTriggerTeleport(triggerId))
+    AreaTriggerTeleport const* atTeleport = sObjectMgr->GetAreaTriggerTeleport(triggerId);
+    if (atTeleport)
+    {
+        bot->RemoveAurasWithInterruptFlags(AURA_INTERRUPT_FLAG_TELEPORTED | AURA_INTERRUPT_FLAG_CHANGE_MAP);
+        bot->TeleportTo(atTeleport->target_mapId, atTeleport->target_X, atTeleport->target_Y, atTeleport->target_Z, atTeleport->target_Orientation);
+        botAI->TellMaster(PlayerbotTextMgr::instance().GetBotTextOrDefault("hello", "Hello", {}));
         return true;
+    }
 
     WorldPacket p(CMSG_AREATRIGGER);
     p << triggerId;

@@ -11,6 +11,7 @@
 #include <iomanip>
 #include <string>
 
+#include "CollisionValue.h"
 #include "Corpse.h"
 #include "Event.h"
 #include "FleeManager.h"
@@ -70,7 +71,7 @@ bool MovementAction::JumpTo(uint32 mapId, float x, float y, float z, MovementPri
     if (IsDuplicateMove(x, y, z))
         return false;
 
-    if (IsWaitingForLastMove(priority))
+    if (IsWaitingForLastMove(priority, x, y, z))
         return false;
 
     float speed = bot->GetSpeed(MOVE_RUN);
@@ -180,7 +181,7 @@ bool MovementAction::MoveTo(uint32 mapId, float x, float y, float z, bool /*idle
     {
         return false;
     }
-    if (IsWaitingForLastMove(priority))
+    if (IsWaitingForLastMove(priority, x, y, z))
     {
         return false;
     }
@@ -910,12 +911,18 @@ bool MovementAction::IsDuplicateMove(float x, float y, float z)
     return true;
 }
 
-bool MovementAction::IsWaitingForLastMove(MovementPriority priority)
+bool MovementAction::IsWaitingForLastMove(MovementPriority priority, float x, float y, float z)
 {
     LastMovement& lastMove = *context->GetValue<LastMovement&>("last movement");
 
     if (priority > lastMove.priority)
         return false;
+
+    if (x != 0.0f || y != 0.0f || z != 0.0f)
+    {
+        if (lastMove.lastMoveShort.GetExactDist(x, y, z) > 2.0f)
+            return false;
+    }
 
     // heuristic 5s
     if (lastMove.lastdelayTime + lastMove.msTime > getMSTime())
@@ -1263,13 +1270,11 @@ bool MovementAction::Follow(Unit* target, float distance, float angle)
     if (bot->GetMotionMaster()->GetCurrentMovementGeneratorType() == FOLLOW_MOTION_TYPE)
     {
         Unit* currentTarget = ServerFacade::instance().GetChaseTarget(bot);
-        if (currentTarget && currentTarget->GetGUID() == target->GetGUID())
-            return false;
+        if (currentTarget && currentTarget->GetGUID() == target->GetGUID() && bot->isMoving())
+            return true;
     }
 
-    if (bot->GetMotionMaster()->GetCurrentMovementGeneratorType() != FOLLOW_MOTION_TYPE)
-        bot->GetMotionMaster()->Clear();
-
+    bot->GetMotionMaster()->Clear();
     bot->GetMotionMaster()->MoveFollow(target, distance, angle);
     return true;
 }
@@ -2731,6 +2736,35 @@ bool SetBehindTargetAction::Execute(Event /*event*/)
 
 bool MoveOutOfCollisionAction::Execute(Event /*event*/)
 {
+    // Check if we're overlapping a specific NPC and step directly away from it.
+    // This gives a deterministic exit direction rather than a random walk that
+    // might push the bot further into the model.
+    if (Creature* npc = CollisionValue::FindOverlappingNPC(bot))
+    {
+        float dx = bot->GetPositionX() - npc->GetPositionX();
+        float dy = bot->GetPositionY() - npc->GetPositionY();
+        float len = std::sqrt(dx * dx + dy * dy);
+
+        float angle;
+        if (len > 0.001f)
+        {
+            // Normalize and step away by the NPC's CombatReach + a 1y clearance margin
+            angle = std::atan2(dy, dx);
+        }
+        else
+        {
+            // Bot is dead-center in the NPC — pick a random direction to break symmetry
+            angle = frand(0.f, float(2 * M_PI));
+        }
+
+        float stepDist = npc->GetCombatReach() + 1.0f;
+        return MoveTo(bot->GetMapId(),
+                      bot->GetPositionX() + std::cos(angle) * stepDist,
+                      bot->GetPositionY() + std::sin(angle) * stepDist,
+                      bot->GetPositionZ());
+    }
+
+    // Fallback: random direction for player/unit stacking collisions
     float angle = M_PI * 2000 / frand(1.f, 1000.f);
     float distance = sPlayerbotAIConfig.followDistance;
     return MoveTo(bot->GetMapId(), bot->GetPositionX() + cos(angle) * distance,

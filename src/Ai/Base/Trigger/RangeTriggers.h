@@ -105,7 +105,7 @@ class FarFromMasterTrigger : public Trigger
 {
 public:
     FarFromMasterTrigger(PlayerbotAI* botAI, std::string const name = "far from master", float distance = 12.0f,
-                         int32 checkInterval = 50)
+                         int32 checkInterval = 5)
         : Trigger(botAI, name, checkInterval), distance(distance)
     {
     }

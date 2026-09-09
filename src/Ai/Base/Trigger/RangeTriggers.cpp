@@ -208,6 +208,11 @@ PartyMemberToHealOutOfSpellRangeTrigger::PartyMemberToHealOutOfSpellRangeTrigger
 
 bool FarFromMasterTrigger::IsActive()
 {
+    Player* master = botAI->GetMaster();
+    if (master && master->IsInWorld() && master->isMoving() &&
+        ServerFacade::instance().IsDistanceGreaterThan(AI_VALUE2(float, "distance", "group leader"), 8.0f))
+        return true;
+
     return ServerFacade::instance().IsDistanceGreaterThan(AI_VALUE2(float, "distance", "group leader"), distance);
 }
 

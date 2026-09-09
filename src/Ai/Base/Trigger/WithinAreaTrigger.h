@@ -19,9 +19,6 @@ public:
     WithinAreaTrigger(PlayerbotAI* botAI) : Trigger(botAI, "within area trigger") {}
 
     bool IsActive() override;
-
-private:
-    bool IsPointInAreaTriggerZone(AreaTrigger const* atEntry, uint32 mapid, float x, float y, float z, float delta);
 };
 
 #endif

@@ -13,6 +13,7 @@
 #include "Event.h"
 #include "PlayerbotTextMgr.h"
 #include "Playerbots.h"
+#include "RandomPlayerbotMgr.h"
 
 static const std::unordered_set<std::string> noReplyMsgs = {
     "join",
@@ -347,13 +348,18 @@ bool ChatReplyAction::HandleWTBItemsReply(Player* bot, ChatChannelSource chatCha
         placeholders["%my_level"] = std::to_string(bot->GetLevel());
         placeholders["%my_role"] = ChatHelper::FormatClass(bot, AiFactory::GetPlayerSpecTab(bot));
         placeholders["%formatted_item_links"] = "";
+        uint32 totalPrice = 0;
 
         for (auto matchingItemId : matchingItemIds)
         {
             ItemTemplate const* proto = sObjectMgr->GetItemTemplate(matchingItemId);
-            placeholders["%formatted_item_links"] += GET_PLAYERBOT_AI(bot)->GetChatHelper()->FormatItem(proto, GET_PLAYERBOT_AI(bot)->GetInventoryItemsCountWithId(matchingItemId));
+            uint32 count = GET_PLAYERBOT_AI(bot)->GetInventoryItemsCountWithId(matchingItemId);
+            placeholders["%formatted_item_links"] += GET_PLAYERBOT_AI(bot)->GetChatHelper()->FormatItem(proto, count);
             placeholders["%formatted_item_links"] += " ";
+            totalPrice += proto->SellPrice * sRandomPlayerbotMgr.GetSellMultiplier(bot) * count;
         }
+
+        placeholders["%cost_gold"] = GET_PLAYERBOT_AI(bot)->GetChatHelper()->formatMoney(totalPrice);
 
         switch (chatChannelSource)
         {

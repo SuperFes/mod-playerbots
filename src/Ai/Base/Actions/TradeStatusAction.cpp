@@ -203,6 +203,13 @@ bool TradeStatusAction::CheckTrade()
     {
         return false;
     }
+
+    if (bot->GetTradeData()->GetSpell() || trader->GetTradeData()->GetSpell() ||
+        bot->GetTradeData()->GetItem(TRADE_SLOT_NONTRADED) || trader->GetTradeData()->GetItem(TRADE_SLOT_NONTRADED))
+    {
+        return true;
+    }
+
     uint32 accountId = bot->GetSession()->GetAccountId();
     if (!sPlayerbotAIConfig.IsInRandomAccountList(accountId))
     {

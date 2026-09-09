@@ -4068,6 +4068,10 @@ void PlayerbotFactory::InitReagents()
             }
             break;
         }
+        case CLASS_ROGUE:
+            if (level >= 16)
+                items.push_back({5060, 1});  // Thieves' Tools
+            break;
         case CLASS_WARLOCK:
             items.push_back({6265, 5});  // Soul Shard
             break;

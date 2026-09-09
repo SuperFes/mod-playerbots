@@ -122,27 +122,17 @@ std::string const ObjectGuidListCalculatedValue::Format()
 
 Unit* UnitCalculatedValue::Get()
 {
-    if (checkInterval < 2)
+    time_t now = getMSTime();
+    if (lastCheckTime && (checkInterval < 2 ? (now == lastCheckTime) : (now - lastCheckTime < checkInterval)))
     {
-        PerfMonitorOperation* pmo = sPerfMonitor.start(
-            PERF_MON_VALUE, this->getName(), this->context ? &this->context->performanceStack : nullptr);
-        value = Calculate();
-        if (pmo)
-            pmo->finish();
+        if (value && value->IsInWorld())
+            return value;
+        return nullptr;
     }
-    else
-    {
-        time_t now = getMSTime();
-        if (!lastCheckTime || now - lastCheckTime >= checkInterval)
-        {
-            lastCheckTime = now;
-            PerfMonitorOperation* pmo = sPerfMonitor.start(
-                PERF_MON_VALUE, this->getName(), this->context ? &this->context->performanceStack : nullptr);
-            value = Calculate();
-            if (pmo)
-                pmo->finish();
-        }
-    }
+
+    lastCheckTime = now;
+    value = Calculate();
+
     // Prevent crashing by InWorld check
     if (value && value->IsInWorld())
         return value;

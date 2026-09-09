@@ -52,7 +52,7 @@ bool PlayerbotAIBase::CanUpdateAI() { return nextAICheckDelay == 0; }
 
 void PlayerbotAIBase::YieldThread(Player* bot, uint32 delay)
 {
-    if (nextAICheckDelay < delay)
+    if (nextAICheckDelay == 0)
     {
         // Adding a deterministic per-bot slight offset (0–200 ms) to stagger updates and prevent cpu spikes.
         uint32 offset = bot ? (bot->GetGUID().GetCounter() % 201) : 0;

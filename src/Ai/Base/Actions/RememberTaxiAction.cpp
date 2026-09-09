@@ -34,6 +34,7 @@ bool RememberTaxiAction::Execute(Event event)
 
             LastMovement& movement = context->GetValue<LastMovement&>("last taxi")->Get();
             movement.taxiNodes.clear();
+            movement.taxiMaster = guid;
             for (uint32 i = 0; i < node_count; ++i)
             {
                 uint32 node;

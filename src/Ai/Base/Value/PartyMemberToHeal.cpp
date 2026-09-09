@@ -8,6 +8,7 @@
 
 #include "Playerbots.h"
 #include "ServerFacade.h"
+#include "Spell.h"
 
 class IsTargetOfHealingSpell : public SpellEntryPredicate
 {
@@ -61,6 +62,13 @@ Unit* PartyMemberToHeal::Calculate()
                 else
                     probeValue = health + player->GetDistance2d(bot) / 10.0f;
 
+                // Prioritize healing player who is taming a pet (Tame Beast spell ID 1515)
+                if (Spell* spell = player->GetCurrentSpell(CURRENT_CHANNELED_SPELL))
+                {
+                    if (spell->GetSpellInfo()->Id == 1515)
+                        probeValue = std::max(0.0f, probeValue - 40.0f);
+                }
+
                 if (probeValue < calc.minValue && Check(player))
                     calc.probe(probeValue, player);
             }
@@ -88,6 +96,14 @@ Unit* PartyMemberToHeal::Calculate()
                 {
                     probeValue = health + player->GetDistance2d(bot) / 10.0f;
                 }
+
+                // Prioritize healing player who is taming a pet (Tame Beast spell ID 1515)
+                if (Spell* spell = player->GetCurrentSpell(CURRENT_CHANNELED_SPELL))
+                {
+                    if (spell->GetSpellInfo()->Id == 1515)
+                        probeValue = std::max(0.0f, probeValue - 40.0f);
+                }
+
                 // delay Check player to here for better performance
                 if (probeValue < calc.minValue && Check(player))
                 {
@@ -102,7 +118,16 @@ Unit* PartyMemberToHeal::Calculate()
             float health = ((Unit*)pet)->GetHealthPct();
             float probeValue = 100.0f;
             if (isRaid || health < sPlayerbotAIConfig.mediumHealth)
-                probeValue = health + 30.0f;
+            {
+                if (pet->GetDistance2d(bot) > sPlayerbotAIConfig.healDistance)
+                    probeValue = health + 30.0f;
+                else
+                    probeValue = health + pet->GetDistance2d(bot) / 10.0f;
+
+                // Support pet if it is under attack
+                if (!pet->getAttackers().empty())
+                    probeValue = std::max(0.0f, probeValue - 20.0f);
+            }
             // delay Check pet to here for better performance
             if (probeValue < calc.minValue && Check(pet))
             {
@@ -116,7 +141,16 @@ Unit* PartyMemberToHeal::Calculate()
             float health = charm->GetHealthPct();
             float probeValue = 100.0f;
             if (isRaid || health < sPlayerbotAIConfig.mediumHealth)
-                probeValue = health + 30.0f;
+            {
+                if (charm->GetDistance2d(bot) > sPlayerbotAIConfig.healDistance)
+                    probeValue = health + 30.0f;
+                else
+                    probeValue = health + charm->GetDistance2d(bot) / 10.0f;
+
+                // Support charm if it is under attack
+                if (!charm->getAttackers().empty())
+                    probeValue = std::max(0.0f, probeValue - 20.0f);
+            }
             // delay Check charm to here for better performance
             if (probeValue < calc.minValue && Check(charm))
             {
@@ -129,11 +163,9 @@ Unit* PartyMemberToHeal::Calculate()
 
 bool PartyMemberToHeal::Check(Unit* player)
 {
-    // return player && player != bot && player->GetMapId() == bot->GetMapId() && player->IsInWorld() &&
-    //     ServerFacade::instance().GetDistance2d(bot, player) < (player->IsPlayer() && botAI->IsTank((Player*)player) ? 50.0f
-    //     : 40.0f);
+    float maxDist = bot->IsInCombat() ? sPlayerbotAIConfig.healDistance * 2 : sPlayerbotAIConfig.healDistance;
     return player->GetMapId() == bot->GetMapId() && !player->IsCharmed() &&
-           bot->GetDistance2d(player) < sPlayerbotAIConfig.healDistance * 2 && bot->IsWithinLOSInMap(player);
+           bot->GetDistance2d(player) <= maxDist && bot->IsWithinLOSInMap(player);
 }
 
 Unit* HealerLowMana::Calculate()

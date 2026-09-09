@@ -10,7 +10,9 @@
 #include "NamedObjectContext.h"
 #include "Value.h"
 
+class Creature;
 class PlayerbotAI;
+class Player;
 
 class CollisionValue : public BoolCalculatedValue, public Qualified
 {
@@ -21,6 +23,10 @@ public:
     }
 
     bool Calculate() override;
+
+    // Returns the nearest overlapping NPC, or nullptr. Used by MoveOutOfCollisionAction
+    // to determine the step-away direction instead of moving randomly.
+    static Creature* FindOverlappingNPC(Player* bot);
 };
 
 #endif
