@@ -200,7 +200,7 @@ bool LootRollAction::ShouldDeferToGroupmate(Group* group, ItemTemplate const* pr
         placeholders["%item_link"] = botAI->GetChatHelper()->FormatItem(proto);
         placeholders["%other_name"] = bestOther->GetName();
 
-        botAI->TellMaster(PlayerbotTextMgr::instance().GetBotTextOrDefault(
+        botAI->SaySocial(PlayerbotTextMgr::instance().GetBotTextOrDefault(
             "loot_defer_to_groupmate", "%other_name needs %item_link more than I do.", placeholders));
     }
 

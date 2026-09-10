@@ -607,6 +607,11 @@ public:
 
     // Social behaviour, biased by the bot's chattiness trait. RollSocial replaces the scattered
     // !urand(0, N) gates; SocialCooldown replaces the duplicated "urand(a, b) + guid jitter" stamps.
+    // Idle chatter belongs somewhere people can see it. Whispering the master is for answers to
+    // things they asked; a bot musing about its gear is talking to the room. Party when grouped,
+    // guild when not, local /say as the fallback so it always lands somewhere.
+    bool SaySocial(std::string const& msg);
+
     bool RollSocial(uint32 oneInN) const;
     uint32 SocialCooldown(uint32 minSeconds, uint32 maxSeconds) const;
 
@@ -687,6 +692,7 @@ protected:
     bool spellInterruptRequested = false;
     BotPersonality _personality;
     time_t _lastActiveTime = 0;
+    time_t _masterMovingTime = 0;
     bool _cityAutonomyActive = false;
     bool _cityRejoinPending = false;
 };

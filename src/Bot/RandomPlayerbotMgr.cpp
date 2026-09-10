@@ -200,7 +200,7 @@ void RandomPlayerbotMgr::LogPlayerLocation()
                 out << std::to_string(bot->getRace()) << ",";
                 out << std::to_string(bot->getClass()) << ",";
                 out << bot->GetMapId() << ",";
-                out << bot->GetLevel() << ",";
+                out << uint32(bot->GetLevel()) << ",";
                 out << bot->GetHealth() << ",";
                 out << bot->GetPowerPct(bot->getPowerType()) << ",";
                 out << bot->GetMoney() << ",";
@@ -244,7 +244,7 @@ void RandomPlayerbotMgr::LogPlayerLocation()
                 out << std::to_string(bot->getRace()) << ",";
                 out << std::to_string(bot->getClass()) << ",";
                 out << bot->GetMapId() << ",";
-                out << bot->GetLevel() << ",";
+                out << uint32(bot->GetLevel()) << ",";
                 out << bot->GetHealth() << ",";
                 out << bot->GetPowerPct(bot->getPowerType()) << ",";
                 out << bot->GetMoney() << ",";

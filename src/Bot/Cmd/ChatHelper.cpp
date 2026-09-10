@@ -393,14 +393,16 @@ std::string const ChatHelper::FormatQuestCannotTakeReason(Player* bot, Quest con
     if (bot->GetLevel() < quest->GetMinLevel())
     {
         std::ostringstream ss;
-        ss << "Level too low (requires level " << quest->GetMinLevel() << ", I am level " << bot->GetLevel() << ")";
+        ss << "Level too low (requires level " << quest->GetMinLevel() << ", I am level " << uint32(bot->GetLevel())
+           << ")";
         return ss.str();
     }
 
     if (quest->GetMaxLevel() > 0 && bot->GetLevel() > quest->GetMaxLevel())
     {
         std::ostringstream ss;
-        ss << "Level too high (max level " << quest->GetMaxLevel() << ", I am level " << bot->GetLevel() << ")";
+        ss << "Level too high (max level " << quest->GetMaxLevel() << ", I am level " << uint32(bot->GetLevel())
+           << ")";
         return ss.str();
     }
 

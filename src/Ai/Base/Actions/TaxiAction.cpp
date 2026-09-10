@@ -25,7 +25,7 @@ bool TaxiAction::Execute(Event event)
     {
         movement.taxiNodes.clear();
         movement.Set(nullptr);
-        botAI->TellMaster(PlayerbotTextMgr::instance().GetBotTextOrDefault(
+        botAI->SaySocial(PlayerbotTextMgr::instance().GetBotTextOrDefault(
             "taxi_ready_next_flight", "I am ready for the next flight", {}));
         return true;
     }
@@ -112,14 +112,14 @@ bool TaxiAction::Execute(Event event)
 
                     if (nodes.size() < 2)
                     {
-                        selfAI->TellMaster(PlayerbotTextMgr::instance().GetBotTextOrDefault(
+                        selfAI->SaySocial(PlayerbotTextMgr::instance().GetBotTextOrDefault(
                             "taxi_no_route_remembered", "I did not catch which flight you took", {}));
                         return;
                     }
 
                     if (self->IsInCombat())
                     {
-                        selfAI->TellMaster(PlayerbotTextMgr::instance().GetBotTextOrDefault(
+                        selfAI->SaySocial(PlayerbotTextMgr::instance().GetBotTextOrDefault(
                             "taxi_in_combat", "I am in combat and cannot board the flight", {}));
                         return;
                     }
@@ -144,7 +144,7 @@ bool TaxiAction::Execute(Event event)
 
                     if (!self->ActivateTaxiPathTo(nodes, flightMaster, 0))
                     {
-                        selfAI->TellMaster(PlayerbotTextMgr::instance().GetBotTextOrDefault(
+                        selfAI->SaySocial(PlayerbotTextMgr::instance().GetBotTextOrDefault(
                             "taxi_could_not_board", "I could not board that flight - check my gold", {}));
                     }
                 },

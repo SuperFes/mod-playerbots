@@ -460,7 +460,7 @@ bool MentionAmbitionAction::Execute(Event /*event*/)
     else
         return false;
 
-    botAI->TellMaster(PlayerbotTextMgr::instance().GetBotTextOrDefault(key, "", placeholders));
+    botAI->SaySocial(PlayerbotTextMgr::instance().GetBotTextOrDefault(key, "", placeholders));
 
     std::string const qualifier = "mention ambition";
     botAI->GetAiObjectContext()->GetValue<time_t>("last said", qualifier)

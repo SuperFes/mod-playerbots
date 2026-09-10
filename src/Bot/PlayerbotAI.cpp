@@ -278,6 +278,12 @@ void PlayerbotAI::UpdateAI(uint32 elapsed, bool minimal)
     if (bot->IsInCombat() || bot->isMoving())
         _lastActiveTime = time(nullptr);
 
+    // Autonomy must not start while the master is still travelling through, so track when they
+    // were last on the move.
+    if (currentMaster && (currentMaster->isMoving() || currentMaster->IsFlying() ||
+                          currentMaster->HasUnitState(UNIT_STATE_IN_FLIGHT) || currentMaster->GetTransport()))
+        _masterMovingTime = time(nullptr);
+
     // Edge-detect the end of city autonomy so the bot rejoins once rather than every tick.
     bool const autonomyNow = IsCityAutonomyActive();
     if (_cityAutonomyActive && !autonomyNow)
@@ -6792,7 +6798,14 @@ bool PlayerbotAI::IsCityAutonomyActive()
     if (bot->IsInCombat() || master->IsInCombat() || currentState == BOT_STATE_COMBAT)
         return false;
 
-    if (master->IsInFlight() || master->HasUnitState(UNIT_STATE_IN_FLIGHT) || master->GetTransport())
+    // IsInFlight() is only UNIT_STATE_IN_FLIGHT, i.e. a taxi - it does not cover a flying mount,
+    // which is how bots ended up sitting at the Shattrath border while the master flew in.
+    if (master->IsFlying() || master->HasUnitState(UNIT_STATE_IN_FLIGHT) || master->GetTransport())
+        return false;
+
+    // Only once the master has actually stopped. Passing through a capital is not parking in it.
+    if (!_masterMovingTime ||
+        time(nullptr) - _masterMovingTime < static_cast<time_t>(sPlayerbotAIConfig.cityAutonomySettleSeconds))
         return false;
 
     if (bot->GetMapId() != master->GetMapId())
@@ -6804,13 +6817,35 @@ bool PlayerbotAI::IsCityAutonomyActive()
     if (!masterZone || !(masterZone->flags & AREA_FLAG_CAPITAL))
         return false;
 
-    return bot->GetZoneId() == master->GetZoneId();
+    if (bot->GetZoneId() != master->GetZoneId())
+        return false;
+
+    // A bot at the far edge of a large capital is not "in town with you" in any useful sense, so it
+    // has to be near the master to begin. Once wandering it may drift out to CityAutonomyRadius.
+    if (!_cityAutonomyActive && bot->GetExactDist2d(master) > sPlayerbotAIConfig.cityAutonomyRadius)
+        return false;
+
+    return true;
 }
 
 uint32 PlayerbotAI::GetIdleSeconds() const
 {
     time_t const now = time(nullptr);
     return (_lastActiveTime && now > _lastActiveTime) ? static_cast<uint32>(now - _lastActiveTime) : 0;
+}
+
+bool PlayerbotAI::SaySocial(std::string const& msg)
+{
+    if (msg.empty())
+        return false;
+
+    if (bot->GetGroup() && SayToParty(msg))
+        return true;
+
+    if (bot->GetGuildId() && SayToGuild(msg))
+        return true;
+
+    return Say(msg);
 }
 
 // Call sites historically wrote `!urand(0, N)`, i.e. one chance in N+1. Preserved exactly at a
