@@ -560,7 +560,7 @@ void PlayerbotAI::UpdateAIGroupMaster()
                         "hello_follow", "Hello, I follow you!", {}));
                 else
                     botAI->TellMaster(PlayerbotTextMgr::instance().GetBotTextOrDefault(
-                        "hello", "Hello!", {}));
+                        "hello", "Hello!", {{"%zone_name", botAI->GetZoneName()}}));
             }
             else
             {

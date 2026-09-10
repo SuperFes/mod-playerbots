@@ -2592,7 +2592,7 @@ void RandomPlayerbotMgr::OnPlayerLogin(Player* player)
                     botAI->SetMaster(player);
                     botAI->ResetStrategies();
                     botAI->TellMaster(PlayerbotTextMgr::instance().GetBotTextOrDefault(
-                        "hello", "Hello", {}));
+                        "hello", "Hello", {{"%zone_name", botAI->GetZoneName()}}));
                 }
 
                 break;

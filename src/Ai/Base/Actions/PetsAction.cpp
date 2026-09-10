@@ -112,7 +112,7 @@ bool PetsAction::Execute(Event event)
             }
             std::string text = PlayerbotTextMgr::instance().GetBotTextOrDefault(
                 "pet_stance_report", "Current stance of %type \"%name\": %stance.",
-                {{"type", type}, {"name", name}, {"stance", stance}});
+                {{"%type", type}, {"%name", name}, {"%stance", stance}});
             botAI->TellMaster(text);
         }
         return true;
@@ -281,7 +281,7 @@ bool PetsAction::Execute(Event event)
     {
         std::string text = PlayerbotTextMgr::instance().GetBotTextOrDefault(
             "pet_unknown_command_error", "Unknown pet command: %param. Use: pet <aggressive|defensive|passive|stance|attack|follow|stay>",
-            {{"param", param}});
+            {{"%param", param}});
         botAI->TellError(text);
         return false;
     }
@@ -300,7 +300,7 @@ bool PetsAction::Execute(Event event)
     {
         std::string text = PlayerbotTextMgr::instance().GetBotTextOrDefault(
             "pet_stance_set_success", "Pet stance set to %stance.",
-            {{"stance", stanceText}});
+            {{"%stance", stanceText}});
         botAI->TellMaster(text);
     }
 

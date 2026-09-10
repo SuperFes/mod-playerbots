@@ -253,8 +253,17 @@ bool TankAttackChatShortcutAction::Execute(Event /*event*/)
     ResetReturnPosition();
     ResetStayPosition();
 
+    std::map<std::string, std::string> placeholders = GetDefaultPlaceholders(botAI, bot, master);
+    Unit* attackTarget = master->GetSelectedUnit();
+    if (!attackTarget)
+        attackTarget = bot->GetVictim();
+
+    placeholders["%target_name"] = attackTarget
+        ? attackTarget->GetName()
+        : PlayerbotTextMgr::instance().GetBotTextOrDefault("string_unknown_target", "our target", {});
+
     botAI->TellMaster(PlayerbotTextMgr::instance().GetBotTextOrDefault(
-        "attacking", "Attacking", GetDefaultPlaceholders(botAI, bot, master)));
+        "attacking", "Attacking", placeholders));
     return true;
 }
 

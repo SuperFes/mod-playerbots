@@ -77,7 +77,7 @@ bool SummonAction::Execute(Event /*event*/)
     if (SummonUsingGos(master, bot, true) || SummonUsingNpcs(master, bot, true))
     {
         botAI->TellMasterNoFacing(PlayerbotTextMgr::instance().GetBotTextOrDefault(
-            "hello", "Hello!", {}));
+            "hello", "Hello!", {{"%zone_name", botAI->GetZoneName()}}));
         return true;
     }
 
