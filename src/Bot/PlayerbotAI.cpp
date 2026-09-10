@@ -968,6 +968,51 @@ void PlayerbotAI::HandleCommand(uint32 type, const std::string& text, Player& fr
     }
 }
 
+bool PlayerbotAI::ShouldMountBeforeFollowing()
+{
+    if (!sPlayerbotAIConfig.mountBeforeFollowing)
+        return false;
+
+    Player* currentMaster = GetMaster();
+    bool const masterRiding = currentMaster && (currentMaster->IsMounted() || currentMaster->IsFlying());
+
+    ShapeshiftForm const form = bot->GetShapeshiftForm();
+    bool const botRiding = bot->IsMounted() || form == FORM_FLIGHT || form == FORM_FLIGHT_EPIC ||
+                           form == FORM_TRAVEL;
+
+    if (!masterRiding || botRiding || bot->IsInCombat() || !HasActivePlayerMaster())
+    {
+        _mountPrioritySince = 0;
+        return false;
+    }
+
+    time_t const now = time(nullptr);
+    if (!_mountPrioritySince)
+        _mountPrioritySince = now;
+    else if (now - _mountPrioritySince >= static_cast<time_t>(sPlayerbotAIConfig.mountPrioritySeconds))
+    {
+        // No mount forthcoming - indoors, too low level, none owned. Chase on foot rather than
+        // stand there. Deliberately leaves the timestamp set so this does not flap; it clears when
+        // the master dismounts or the bot finally gets a mount.
+        return false;
+    }
+
+    return true;
+}
+
+void PlayerbotAI::RemountAfterTeleportIfRequested()
+{
+    if (!_remountOnArrival)
+        return;
+
+    _remountOnArrival = false;
+
+    if (!bot->IsInWorld() || bot->IsMounted())
+        return;
+
+    CheckMountStateAction(this).MountInstantly();
+}
+
 void PlayerbotAI::HandleTeleportAck()
 {
     if (!bot || !bot->GetSession())
@@ -1010,6 +1055,8 @@ void PlayerbotAI::HandleTeleportAck()
             bot->StopMoving();
         }
 
+        RemountAfterTeleportIfRequested();
+
         // simulate far teleport latency (cmangos-style)
         SetNextCheckDelay(urand(2000, 5000));
         return;
@@ -1041,6 +1088,8 @@ void PlayerbotAI::HandleTeleportAck()
             bot->GetMotionMaster()->Clear(true);
             bot->StopMoving();
         }
+
+        RemountAfterTeleportIfRequested();
 
         // simulate near teleport latency
         SetNextCheckDelay(urand(1000, 2000));

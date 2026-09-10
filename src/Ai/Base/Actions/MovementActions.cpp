@@ -3092,43 +3092,6 @@ bool RejoinMasterAction::isUseful()
     return botAI->GetMasterMapMismatchSeconds() >= sPlayerbotAIConfig.crossMapRejoinSeconds;
 }
 
-bool RejoinMasterAction::ShouldMountBeforeRejoin(Player* master)
-{
-    if (!sPlayerbotAIConfig.mountBeforeRejoin)
-        return false;
-
-    // A master on foot, or one inside somewhere that forbids mounts, is nothing to match.
-    if (!master->IsMounted() && !master->IsFlying())
-        return false;
-
-    ShapeshiftForm const form = bot->GetShapeshiftForm();
-    if (bot->IsMounted() || form == FORM_FLIGHT || form == FORM_FLIGHT_EPIC || form == FORM_TRAVEL)
-    {
-        _mountingSince = 0;
-        return false;
-    }
-
-    time_t const now = time(nullptr);
-    if (!_mountingSince)
-        _mountingSince = now;
-    else if (now - _mountingSince >= sPlayerbotAIConfig.rejoinMountSeconds)
-    {
-        // No mount to be had - indoors, too low level, none learned. Go across on foot rather than
-        // stand about in town waiting for one.
-        _mountingSince = 0;
-        return false;
-    }
-
-    // Mounting is a cast that any movement cancels, and the bot may still be mid-errand.
-    if (bot->isMoving())
-        bot->StopMoving();
-
-    if (!bot->IsNonMeleeSpellCast(false))
-        botAI->DoSpecificAction("check mount state", Event(), true);
-
-    return true;
-}
-
 bool RejoinMasterAction::Execute(Event /*event*/)
 {
     Player* master = GetMaster();
@@ -3141,34 +3104,24 @@ bool RejoinMasterAction::Execute(Event /*event*/)
     if (!crossMap && bot->GetExactDist2d(master) <= sPlayerbotAIConfig.cityAutonomyRadius)
     {
         botAI->ClearCityRejoin();
-        _mountingSince = 0;
         return false;
     }
 
-    // Only on the tick that starts the rejoin, or mounting up would repeat it every tick.
-    if (!_mountingSince)
-    {
-        std::map<std::string, std::string> placeholders;
-        placeholders["%my_class"] = chat->FormatClass(bot->getClass());
+    std::map<std::string, std::string> placeholders;
+    placeholders["%my_class"] = chat->FormatClass(bot->getClass());
 
-        botAI->SayToParty(PlayerbotTextMgr::instance().GetBotTextOrDefault(
-            crossMap ? "cross_map_rejoin" : "city_rejoin", "Coming!", placeholders));
-    }
+    botAI->SayToParty(PlayerbotTextMgr::instance().GetBotTextOrDefault(
+        crossMap ? "cross_map_rejoin" : "city_rejoin", "Coming!", placeholders));
 
     if (bot->IsSitState())
         bot->SetStandState(UNIT_STAND_STATE_STAND);
 
-    // Arrive travelling the way the master is. Teleporting first and mounting afterwards drops the
-    // bot beside a flying master with nothing under it, so it falls out of the sky and mounts on the
-    // way down.
-    if (ShouldMountBeforeRejoin(master))
-        return true;
+    // Arrive travelling the way the master is. Mounting first is pointless - TeleportTo strips the
+    // mount on the way - so ask for it to be put back the instant we land, before gravity applies.
+    if (sPlayerbotAIConfig.mountOnRejoin && (master->IsMounted() || master->IsFlying()))
+        botAI->RequestRemountOnArrival();
 
     botAI->ClearCityRejoin();
-
-    // The one choke point before the teleport, so no path out of ShouldMountBeforeRejoin - the
-    // master landing mid-cast included - can leave a stale timestamp to poison the next rejoin.
-    _mountingSince = 0;
 
     bot->RemoveAurasWithInterruptFlags(AURA_INTERRUPT_FLAG_TELEPORTED | AURA_INTERRUPT_FLAG_CHANGE_MAP);
     bot->TeleportTo(master->GetMapId(), master->GetPositionX(), master->GetPositionY(),

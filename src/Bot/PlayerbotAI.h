@@ -398,6 +398,7 @@ public:
     void HandleMasterIncomingPacket(WorldPacket const& packet);
     void HandleMasterOutgoingPacket(WorldPacket const& packet);
     void HandleTeleportAck();
+    void RemountAfterTeleportIfRequested();
     void ChangeEngine(BotState type);
     void ChangeEngineOnCombat();
     void ChangeEngineOnNonCombat();
@@ -629,6 +630,17 @@ public:
     bool IsCityAutonomyActive() const { return _cityAutonomyActive; }
 
     // Peek and clear are separate so isUseful() stays free of side effects.
+    // Teleporting strips the mount: Player::TeleportTo removes AURA_INTERRUPT_FLAG_TELEPORTED auras
+    // for any hop over 100 yards, and mounts carry that flag - the Black Qiraji Battle Tank is
+    // special-cased in SpellInfoCorrections precisely because it must not. So the mount is put back
+    // on arrival rather than acquired beforehand and thrown away.
+    void RequestRemountOnArrival() { _remountOnArrival = true; }
+
+    // Mounting outranks chasing while the master is mounted. A mount is a cast that any movement
+    // cancels, so a bot that follows first has its cast broken every tick and never mounts at all.
+    // Bounded, so a bot that simply cannot mount still follows on foot.
+    bool ShouldMountBeforeFollowing();
+
     // A boat, zeppelin or tram - something that carries the player away. A city lift is also a
     // transport as far as GetTransport() is concerned, but riding one is not leaving town.
     static bool IsLeavingOnTransport(Player* player);
@@ -716,6 +728,8 @@ protected:
     bool _cityAutonomyActive = false;
     time_t _cityAutonomyLostAt = 0;
     bool _cityRejoinPending = false;
+    bool _remountOnArrival = false;
+    time_t _mountPrioritySince = 0;
     bool _cityAnchorSet = false;
     float _cityAnchorX = 0.0f;
     float _cityAnchorY = 0.0f;

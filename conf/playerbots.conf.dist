@@ -519,14 +519,19 @@ AiPlayerbot.AuctionPriceMultiplier = 3.0
 # every spell with a cast time.
 AiPlayerbot.SafeDismountHeight = 8
 
-# Get a mount under the bot before it teleports to its master, matching whatever the master is
-# riding. Without this a bot sent to a flying master arrives with nothing underneath it, falls, and
-# mounts somewhere on the way down.
-AiPlayerbot.MountBeforeRejoin = 1
+# Put a mount back under the bot the instant it lands next to a mounted master, matched to what the
+# master is riding. Mounting before the teleport cannot work - TeleportTo strips the mount for any
+# hop over 100 yards - so this applies on arrival, before the bot has a chance to fall.
+AiPlayerbot.MountOnRejoin = 1
 
-# How long to spend trying before giving up and travelling as-is. Covers the bot being indoors,
-# too low level to ride, or owning no mount at all.
-AiPlayerbot.RejoinMountSeconds = 6
+# Let a bot finish mounting before it chases a mounted master. A mount is a cast that any movement
+# cancels, so following first breaks the cast every tick and the bot never gets a mount - most
+# visible when the master flies straight up and the bots scurry about below him.
+AiPlayerbot.MountBeforeFollowing = 1
+
+# How long to hold the chase for. After this the bot follows on foot regardless, covering the cases
+# where no mount is coming: indoors, below the riding level, or owning none.
+AiPlayerbot.MountPrioritySeconds = 5
 
 # Bots teleport to their master when he changes map - into an instance, through a portal, onto
 # another continent. Following cannot cross maps at all, and the area trigger at a portal only

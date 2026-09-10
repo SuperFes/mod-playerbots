@@ -287,6 +287,12 @@ bool FollowAction::isUseful()
     if (botAI->IsCityAutonomyActive())
         return false;
 
+    // Get a mount first. Chasing a mounted master on foot is futile anyway, and the movement breaks
+    // the mount cast every tick - which is what left bots milling about in small circles below a
+    // master flying straight up, only mounting once he stopped ascending.
+    if (botAI->ShouldMountBeforeFollowing())
+        return false;
+
     // move from group takes priority over follow as it's added and removed automatically
     // (without removing/adding follow)
     if (botAI->HasStrategy("move from group", BOT_STATE_COMBAT) ||

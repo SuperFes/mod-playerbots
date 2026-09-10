@@ -124,8 +124,9 @@ public:
     bool buyReagents;
     uint32 buyReagentsStack;
     float safeDismountHeight;
-    bool mountBeforeRejoin;
-    uint32 rejoinMountSeconds;
+    bool mountOnRejoin;
+    bool mountBeforeFollowing;
+    uint32 mountPrioritySeconds;
     bool followMasterAcrossMaps;
     uint32 crossMapRejoinSeconds;
     bool cityAutonomy;
