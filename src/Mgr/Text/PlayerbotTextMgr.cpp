@@ -11,6 +11,8 @@
 
 #include "PlayerbotTextMgr.h"
 
+#include <regex>
+
 void PlayerbotTextMgr::replaceAll(std::string& str, const std::string& from, const std::string& to)
 {
     if (from.empty())
@@ -92,6 +94,28 @@ std::string PlayerbotTextMgr::GetBotText(std::string name)
     return !textEntry.m_text[GetLocalePriority()].empty() ? textEntry.m_text[GetLocalePriority()] : textEntry.m_text[0];
 }
 
+void PlayerbotTextMgr::WarnOnUnresolvedTokens(std::string const& name, std::string const& text)
+{
+    static std::regex const token("%[A-Za-z_][A-Za-z0-9_]*");
+
+    auto begin = std::sregex_iterator(text.begin(), text.end(), token);
+    for (auto i = begin; i != std::sregex_iterator(); ++i)
+    {
+        std::string const key = name + i->str();
+
+        // One line per (row, token) for the life of the process - this is a content bug to be fixed
+        // once, not something to repeat every time a bot opens its mouth.
+        {
+            std::lock_guard<std::mutex> guard(_unresolvedLock);
+            if (!_unresolvedSeen.insert(key).second)
+                continue;
+        }
+
+        LOG_ERROR("playerbots", "Bot text '{}' uses {} but the caller supplied no such placeholder; "
+                                "it will be said verbatim.", name, i->str());
+    }
+}
+
 std::string PlayerbotTextMgr::GetBotText(std::string name, std::map<std::string, std::string> placeholders)
 {
     std::string botText = GetBotText(name);
@@ -100,6 +124,8 @@ std::string PlayerbotTextMgr::GetBotText(std::string name, std::map<std::string,
 
     for (std::map<std::string, std::string>::iterator i = placeholders.begin(); i != placeholders.end(); ++i)
         replaceAll(botText, i->first, i->second);
+
+    WarnOnUnresolvedTokens(name, botText);
 
     return botText;
 }

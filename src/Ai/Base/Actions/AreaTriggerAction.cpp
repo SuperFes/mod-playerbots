@@ -61,7 +61,7 @@ bool ReachAreaTriggerAction::Execute(Event event)
     {
         bot->RemoveAurasWithInterruptFlags(AURA_INTERRUPT_FLAG_TELEPORTED | AURA_INTERRUPT_FLAG_CHANGE_MAP);
         bot->TeleportTo(atTeleport->target_mapId, atTeleport->target_X, atTeleport->target_Y, atTeleport->target_Z, atTeleport->target_Orientation);
-        botAI->TellMaster(PlayerbotTextMgr::instance().GetBotTextOrDefault("hello", "Hello", {}));
+        botAI->TellMaster(PlayerbotTextMgr::instance().GetBotTextOrDefault("hello", "Hello", {{"%zone_name", botAI->GetZoneName()}}));
         return true;
     }
 
@@ -97,7 +97,7 @@ bool AreaTriggerAction::Execute(Event /*event*/)
     {
         bot->RemoveAurasWithInterruptFlags(AURA_INTERRUPT_FLAG_TELEPORTED | AURA_INTERRUPT_FLAG_CHANGE_MAP);
         bot->TeleportTo(atTeleport->target_mapId, atTeleport->target_X, atTeleport->target_Y, atTeleport->target_Z, atTeleport->target_Orientation);
-        botAI->TellMaster(PlayerbotTextMgr::instance().GetBotTextOrDefault("hello", "Hello", {}));
+        botAI->TellMaster(PlayerbotTextMgr::instance().GetBotTextOrDefault("hello", "Hello", {{"%zone_name", botAI->GetZoneName()}}));
         return true;
     }
 
@@ -106,6 +106,6 @@ bool AreaTriggerAction::Execute(Event /*event*/)
     p.rpos(0);
     bot->GetSession()->HandleAreaTriggerOpcode(p);
 
-    botAI->TellMaster(PlayerbotTextMgr::instance().GetBotTextOrDefault("hello", "Hello", {}));
+    botAI->TellMaster(PlayerbotTextMgr::instance().GetBotTextOrDefault("hello", "Hello", {{"%zone_name", botAI->GetZoneName()}}));
     return true;
 }

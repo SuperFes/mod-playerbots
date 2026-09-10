@@ -8,6 +8,9 @@
 #define PLAYERBOTS_PLAYERBOTTEXTMGR_H
 
 #include <map>
+#include <mutex>
+#include <set>
+#include <string>
 #include <vector>
 
 #include "Common.h"
@@ -58,6 +61,8 @@ enum ChatReplyType
     REPLY_ADMIN_ABUSE
 };
 
+#include <regex>
+
 class PlayerbotTextMgr
 {
 public:
@@ -86,6 +91,15 @@ public:
     void ResetLocalePriority();
 
 private:
+    // Substitution is a plain find-and-replace, so a token the caller never supplied survives into
+    // chat verbatim ("Greetings from %zone_name"). Nothing in the type system connects a text pool
+    // row to the call site that fills it, so catch the mismatch where it actually shows up.
+    void WarnOnUnresolvedTokens(std::string const& name, std::string const& text);
+
+    std::mutex _unresolvedLock;
+    std::set<std::string> _unresolvedSeen;
+
+
     PlayerbotTextMgr()
     {
         for (uint8 i = 0; i < TOTAL_LOCALES; ++i)

@@ -339,6 +339,9 @@ bool BroadcastHelper::BroadcastQuestUpdateAddKill(PlayerbotAI* ai, Player* bot, 
     placeholders["%quest_obj_required"] = std::to_string(requiredCount);
     placeholders["%quest_obj_missing"] = std::to_string(requiredCount - std::min(availableCount, requiredCount));
     placeholders["%quest_obj_full_formatted"] = ai->GetChatHelper()->FormatQuestObjective(obectiveName, availableCount, requiredCount);
+    // Some rows spell the same two numbers this way.
+    placeholders["%current"] = std::to_string(availableCount);
+    placeholders["%total"] = std::to_string(requiredCount);
 
     if (availableCount < requiredCount
         && urand(1, sPlayerbotAIConfig.broadcastChanceMaxValue) <= sPlayerbotAIConfig.broadcastChanceQuestUpdateObjectiveProgress)
@@ -381,6 +384,10 @@ bool BroadcastHelper::BroadcastQuestUpdateAddItem(PlayerbotAI* ai, Player* bot, 
     placeholders["%quest_obj_required"] = std::to_string(requiredCount);
     placeholders["%quest_obj_missing"] = std::to_string(requiredCount - std::min(availableCount, requiredCount));
     placeholders["%quest_obj_full_formatted"] = ai->GetChatHelper()->FormatQuestObjective(itemLinkFormatted, availableCount, requiredCount);
+    // Some rows spell the same values this way; the objective for an item quest is the item.
+    placeholders["%current"] = std::to_string(availableCount);
+    placeholders["%total"] = std::to_string(requiredCount);
+    placeholders["%quest_obj_name"] = itemLinkFormatted;
 
     if (availableCount < requiredCount
         && urand(1, sPlayerbotAIConfig.broadcastChanceMaxValue) <= sPlayerbotAIConfig.broadcastChanceQuestUpdateObjectiveProgress)
@@ -488,6 +495,7 @@ bool BroadcastHelper::BroadcastKill(PlayerbotAI* ai, Player* bot, Creature *crea
         return false;
     std::map<std::string, std::string> placeholders;
     placeholders["%victim_name"] = creature->GetName();
+    placeholders["%target_name"] = creature->GetName();
     AreaTableEntry const* current_area = ai->GetCurrentArea();
     AreaTableEntry const* current_zone = ai->GetCurrentZone();
     placeholders["%area_name"] = current_area ? ai->GetLocalizedAreaName(current_area) : PlayerbotTextMgr::instance().GetBotText("string_unknown_area");
