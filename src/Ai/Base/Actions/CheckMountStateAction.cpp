@@ -204,6 +204,33 @@ bool CheckMountStateAction::isUseful()
     return true;
 }
 
+bool CheckMountStateAction::CastMount(uint32 spellId) const
+{
+    if (!_instant)
+        return botAI->CastSpell(spellId, bot);
+
+    // Triggered: applies this tick. Anything with a cast time would leave the bot falling through
+    // it, which is the whole reason this path exists.
+    bot->CastSpell(bot, spellId, true);
+
+    return true;
+}
+
+bool CheckMountStateAction::MountInstantly()
+{
+    // isUseful() is what populates master and the shapeshift forms that Mount() reads, as well as
+    // vetting outdoors/level/strategy - so it has to run even though we are not going through the
+    // engine here.
+    if (!isUseful())
+        return false;
+
+    _instant = true;
+    bool const mounted = Mount();
+    _instant = false;
+
+    return mounted;
+}
+
 bool CheckMountStateAction::Mount()
 {
     // Remove current Shapeshift if need be
@@ -265,22 +292,22 @@ bool CheckMountStateAction::Dismount()
         float const height = HeightAboveGround();
         if (height > sPlayerbotAIConfig.safeDismountHeight)
         {
-            // Deliberately does not consume the tick: "follow" is ranked just below this action and
-            // is what flies the bot down. Returning true here would starve it and leave the bot
-            // hovering, waiting to be low enough to do the thing it is being prevented from doing.
-            if (!botAI->HasActivePlayerMaster())
-            {
-                float const x = bot->GetPositionX();
-                float const y = bot->GetPositionY();
-                float groundZ = bot->GetMapHeight(x, y, bot->GetPositionZ(), true, MAX_FALL_DISTANCE);
+            // Descend under our own power rather than waiting to be brought down. "follow" cannot
+            // be relied on for this: it measures distance in 2D, so a bot hovering directly above
+            // the master reads as already in position and never fires - which deadlocks a bot that
+            // is simultaneously too high to dismount and too close to follow.
+            float const x = bot->GetPositionX();
+            float const y = bot->GetPositionY();
+            float groundZ = bot->GetMapHeight(x, y, bot->GetPositionZ(), true, MAX_FALL_DISTANCE);
 
-                // Nobody to follow down, so descend under our own power. Straight down, no path -
-                // there is no navmesh in mid-air to generate one from.
-                if (groundZ > INVALID_HEIGHT)
-                    bot->GetMotionMaster()->MovePoint(0, x, y, groundZ + SAFE_DISMOUNT_APPROACH,
-                                                      FORCED_MOVEMENT_NONE, 0.f, 0.0f, false);
-            }
+            // Only start a new descent once the last one has run its course, or re-issuing the
+            // spline every tick would keep resetting it and the bot would hang in the air.
+            if (groundZ > INVALID_HEIGHT && bot->movespline->Finalized())
+                bot->GetMotionMaster()->MovePoint(0, x, y, groundZ + SAFE_DISMOUNT_APPROACH,
+                                                  FORCED_MOVEMENT_NONE, 0.f, 0.0f, false);
 
+            // Does not consume the tick either way: "follow" ranks just below this action, and if
+            // the master has moved off horizontally it should still get its turn.
             return false;
         }
     }
@@ -460,7 +487,7 @@ bool CheckMountStateAction::TryPreferredMount(Player* master) const
     // Check if spell can be cast - for now allow all, even if the bot does not have the actual mount
     //if (botAI->CanCastSpell(mountId, botAI->GetBot()))
     //{
-    botAI->CastSpell(chosenMountId, botAI->GetBot());
+    CastMount(chosenMountId);
     return true;
     //}
 
@@ -494,7 +521,7 @@ bool CheckMountStateAction::TryRandomMountFiltered(const std::map<int32, std::ve
 
                 if (botAI->CanCastSpell(ids[index], bot))
                 {
-                    botAI->CastSpell(ids[index], bot);
+                    CastMount(ids[index]);
                     return true;
                 }
             }

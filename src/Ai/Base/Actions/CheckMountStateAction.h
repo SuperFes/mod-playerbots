@@ -43,6 +43,10 @@ public:
     bool isPossible() override { return true; }
     bool Mount();
 
+    // Same choice of mount as always - matched to the master's type and speed - but applied without
+    // a cast bar. For arriving somewhere already mounted, where a 1.5s cast is 1.5s of falling.
+    bool MountInstantly();
+
     static void CompleteDismount(Player* bot);
 
 private:
@@ -51,6 +55,10 @@ private:
     ShapeshiftForm botInShapeshiftForm;
     static std::unordered_map<uint32, PreferredMountCache> mountCache;
     static bool preferredMountTableChecked;
+    // Cast the chosen mount, honouring _instant.
+    bool CastMount(uint32 spellId) const;
+
+    bool _instant = false;
     float CalculateDismountDistance() const;
     float CalculateMountDistance() const;
     // False when the bot is too high to let go of a flying mount. Callers must propagate that so
