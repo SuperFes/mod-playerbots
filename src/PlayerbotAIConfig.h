@@ -123,6 +123,7 @@ public:
     float auctionPriceMultiplier;
     bool buyReagents;
     uint32 buyReagentsStack;
+    float safeDismountHeight;
     bool mountBeforeRejoin;
     uint32 rejoinMountSeconds;
     bool followMasterAcrossMaps;

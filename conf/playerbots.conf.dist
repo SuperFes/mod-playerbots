@@ -513,6 +513,12 @@ AiPlayerbot.AuctionPriceMultiplier = 3.0
 # they say so and teleport to you. Autonomy only ever happens while you are in the city too, so
 # the out-of-range window is seconds: MaxGroupXPDistance (74 yards, worldserver.conf) gates XP,
 # quest credit and loot on proximity, and nothing is missed while the group is parked.
+# How far above the ground a bot may be and still let go of a flying mount. Above this it descends
+# first. Beyond looking silly, a bot dropped from height keeps MOVEMENTFLAG_FALLING forever - it has
+# no client to send the landing packet that clears it - and that flag reads as movement, which blocks
+# every spell with a cast time.
+AiPlayerbot.SafeDismountHeight = 8
+
 # Get a mount under the bot before it teleports to its master, matching whatever the master is
 # riding. Without this a bot sent to a flying master arrives with nothing underneath it, falls, and
 # mounts somewhere on the way down.

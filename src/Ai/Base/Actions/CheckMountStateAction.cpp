@@ -6,6 +6,8 @@
 
 #include "CheckMountStateAction.h"
 
+#include "MotionMaster.h"
+
 #include <algorithm>
 
 #include "AreaDefines.h"
@@ -23,6 +25,9 @@
 
 static constexpr uint32 SPELL_COLD_WEATHER_FLYING = 54197;
 static constexpr float PARACHUTE_LAND_THRESHOLD = 15.0f;
+
+// How far above the ground the bot aims for when descending on its own before letting go.
+static constexpr float SAFE_DISMOUNT_APPROACH = 2.0f;
 
 // Define the static map / init bool for caching bot preferred mount data globally
 std::unordered_map<uint32, PreferredMountCache> CheckMountStateAction::mountCache;
@@ -113,10 +118,7 @@ bool CheckMountStateAction::Execute(Event /*event*/)
         botAI->RemoveShapeshift();
 
     if (shouldDismount && bot->IsMounted())
-    {
-        Dismount();
-        return true;
-    }
+        return Dismount();
 
     bool inBattleground = bot->InBattleground();
     bool const noRealMaster = (!master || master == bot);
@@ -128,10 +130,7 @@ bool CheckMountStateAction::Execute(Event /*event*/)
             return Mount();
 
         else if (ShouldDismountForMaster(master) && bot->IsMounted())
-        {
-            Dismount();
-            return true;
-        }
+            return Dismount();
 
         return false;
     }
@@ -143,10 +142,7 @@ bool CheckMountStateAction::Execute(Event /*event*/)
 
     if (!bot->IsFlying() && shouldDismount && bot->IsMounted() &&
         (enemy || dps || (!noAttackers && bot->IsInCombat())))
-    {
-        Dismount();
-        return true;
-    }
+        return Dismount();
 
     return false;
 }
@@ -247,8 +243,48 @@ bool CheckMountStateAction::Mount()
     return false;
 }
 
-void CheckMountStateAction::Dismount()
+float CheckMountStateAction::HeightAboveGround() const
 {
+    float const groundZ = bot->GetMapHeight(bot->GetPositionX(), bot->GetPositionY(),
+                                            bot->GetPositionZ(), true, MAX_FALL_DISTANCE);
+
+    if (groundZ <= INVALID_HEIGHT)
+        return -1.0f;
+
+    return bot->GetPositionZ() - groundZ;
+}
+
+bool CheckMountStateAction::Dismount()
+{
+    // Cancelling a flying mount at altitude drops the bot out of the sky. Worse than the look of it,
+    // a bot has no client to send MSG_MOVE_FALL_LAND, so the MOVEMENTFLAG_FALLING that the fall sets
+    // is never cleared - and that flag counts as movement, which blocks every spell with a cast time
+    // from then on.
+    if (bot->IsFlying())
+    {
+        float const height = HeightAboveGround();
+        if (height > sPlayerbotAIConfig.safeDismountHeight)
+        {
+            // Deliberately does not consume the tick: "follow" is ranked just below this action and
+            // is what flies the bot down. Returning true here would starve it and leave the bot
+            // hovering, waiting to be low enough to do the thing it is being prevented from doing.
+            if (!botAI->HasActivePlayerMaster())
+            {
+                float const x = bot->GetPositionX();
+                float const y = bot->GetPositionY();
+                float groundZ = bot->GetMapHeight(x, y, bot->GetPositionZ(), true, MAX_FALL_DISTANCE);
+
+                // Nobody to follow down, so descend under our own power. Straight down, no path -
+                // there is no navmesh in mid-air to generate one from.
+                if (groundZ > INVALID_HEIGHT)
+                    bot->GetMotionMaster()->MovePoint(0, x, y, groundZ + SAFE_DISMOUNT_APPROACH,
+                                                      FORCED_MOVEMENT_NONE, 0.f, 0.0f, false);
+            }
+
+            return false;
+        }
+    }
+
     if (bot->isMoving())
         bot->StopMoving();
 
@@ -256,6 +292,8 @@ void CheckMountStateAction::Dismount()
     bot->GetSession()->HandleCancelMountAuraOpcode(emptyPacket);
 
     ClearStaleFlightFlags();
+
+    return true;
 }
 
 void CheckMountStateAction::ClearStaleFlightFlags()

@@ -145,6 +145,7 @@ bool PlayerbotAIConfig::Initialize()
         std::max(1.0f, sConfigMgr->GetOption<float>("AiPlayerbot.AuctionPriceMultiplier", 3.0f));
     buyReagents = sConfigMgr->GetOption<bool>("AiPlayerbot.BuyReagents", true);
     buyReagentsStack = std::min<uint32>(60u, sConfigMgr->GetOption<uint32>("AiPlayerbot.BuyReagentsStack", 20));
+    safeDismountHeight = std::max(1.0f, sConfigMgr->GetOption<float>("AiPlayerbot.SafeDismountHeight", 8.0f));
     mountBeforeRejoin = sConfigMgr->GetOption<bool>("AiPlayerbot.MountBeforeRejoin", true);
     rejoinMountSeconds = sConfigMgr->GetOption<uint32>("AiPlayerbot.RejoinMountSeconds", 6);
     followMasterAcrossMaps = sConfigMgr->GetOption<bool>("AiPlayerbot.FollowMasterAcrossMaps", true);

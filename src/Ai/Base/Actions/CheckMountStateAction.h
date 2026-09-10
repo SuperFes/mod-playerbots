@@ -53,7 +53,12 @@ private:
     static bool preferredMountTableChecked;
     float CalculateDismountDistance() const;
     float CalculateMountDistance() const;
-    void Dismount();
+    // False when the bot is too high to let go of a flying mount. Callers must propagate that so
+    // the tick falls through to "follow", which is what brings the bot back down.
+    bool Dismount();
+
+    // Height above the ground below, or a negative value where there is no ground data.
+    float HeightAboveGround() const;
     void ClearStaleFlightFlags();
     bool ShouldFollowMasterMountState(Player* master, bool noAttackers, bool shouldMount) const;
     bool ShouldDismountForMaster(Player* master) const;
