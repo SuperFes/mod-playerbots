@@ -118,8 +118,16 @@ public:
     bool utilityCallouts;
     bool ambientSay;
     bool vendorDeclutter;
+    bool auctionSurplus;
+    uint32 auctionMaxPerVisit;
+    float auctionPriceMultiplier;
+    bool buyReagents;
+    uint32 buyReagentsStack;
     bool cityAutonomy;
     float cityAutonomyRadius;
+    uint32 cityAutonomySettleSeconds;
+    float cityErrandChance, cityErrandRange;
+    uint32 cityErrandSeconds;
     uint32 criticalHealth, lowHealth, mediumHealth, almostFullHealth;
     uint32 lowMana, mediumMana, highMana;
     bool autoSaveMana;

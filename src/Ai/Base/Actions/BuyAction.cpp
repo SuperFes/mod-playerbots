@@ -6,6 +6,8 @@
 
 #include "BuyAction.h"
 
+#include "GenericBuffUtils.h"
+
 #include "BudgetValues.h"
 #include "Event.h"
 #include "ItemCountValue.h"
@@ -252,4 +254,111 @@ bool BuyAction::BuyItem(VendorItemData const* tItems, ObjectGuid vendorguid, Ite
     }
 
     return false;
+}
+
+std::set<uint32> BuyReagentsAction::FindMissingReagents() const
+{
+    std::set<uint32> wanted;
+
+    for (auto const& entry : bot->GetSpellMap())
+    {
+        uint32 const spellId = entry.first;
+
+        if (entry.second->State == PLAYERSPELL_REMOVED || !entry.second->Active)
+            continue;
+
+        SpellInfo const* spellInfo = sSpellMgr->GetSpellInfo(spellId);
+        if (!spellInfo || spellInfo->IsPassive())
+            continue;
+
+        // Already able to cast it, so nothing to restock.
+        if (ai::buff::HasRequiredReagents(bot, spellId))
+            continue;
+
+        for (uint8 i = 0; i < MAX_SPELL_REAGENTS; ++i)
+            if (spellInfo->Reagent[i] > 0)
+                wanted.insert(static_cast<uint32>(spellInfo->Reagent[i]));
+    }
+
+    return wanted;
+}
+
+bool BuyReagentsAction::isUseful()
+{
+    if (!sPlayerbotAIConfig.buyReagents)
+        return false;
+
+    if (bot->IsInCombat() || botAI->GetState() == BOT_STATE_COMBAT || bot->isMoving())
+        return false;
+
+    // Same gate as the other vendor work: only once the group has actually stopped.
+    if (botAI->GetIdleSeconds() < sPlayerbotAIConfig.tradeskillIdleSeconds)
+        return false;
+
+    GuidVector const npcs = botAI->GetAiObjectContext()->GetValue<GuidVector>("nearest npcs")->Get();
+    for (ObjectGuid const guid : npcs)
+        if (bot->GetNPCIfCanInteractWith(guid, UNIT_NPC_FLAG_VENDOR))
+            return !FindMissingReagents().empty();
+
+    return false;
+}
+
+bool BuyReagentsAction::Execute(Event /*event*/)
+{
+    std::set<uint32> const wanted = FindMissingReagents();
+    if (wanted.empty())
+        return false;
+
+    GuidVector const npcs = botAI->GetAiObjectContext()->GetValue<GuidVector>("nearest npcs")->Get();
+
+    bool bought = false;
+    for (ObjectGuid const guid : npcs)
+    {
+        Creature* vendor = bot->GetNPCIfCanInteractWith(guid, UNIT_NPC_FLAG_VENDOR);
+        if (!vendor)
+            continue;
+
+        VendorItemData const* items = vendor->GetVendorItems();
+        if (!items)
+            continue;
+
+        for (uint32 const itemId : wanted)
+        {
+            ItemTemplate const* proto = sObjectMgr->GetItemTemplate(itemId);
+            if (!proto)
+                continue;
+
+            // BuyItem is a no-op when this vendor does not stock it, so trying every nearby vendor
+            // is how a bot finds the one that sells what it needs.
+            for (uint32 n = 0; n < sPlayerbotAIConfig.buyReagentsStack; ++n)
+                if (!BuyItem(items, guid, proto))
+                    break;
+                else
+                    bought = true;
+        }
+
+        // Ammo is not a spell reagent, so the scan above misses it - but ItemUsageValue already
+        // reports ITEM_USAGE_AMMO when a hunter is below its supply, so ask the vendor's stock
+        // directly and let the existing classification decide.
+        for (VendorItem const* vendorItem : items->m_items)
+        {
+            if (!vendorItem || !vendorItem->item)
+                continue;
+
+            ItemTemplate const* proto = sObjectMgr->GetItemTemplate(vendorItem->item);
+            if (!proto)
+                continue;
+
+            if (AI_VALUE2(ItemUsage, "item usage", std::to_string(proto->ItemId)) != ITEM_USAGE_AMMO)
+                continue;
+
+            for (uint32 n = 0; n < sPlayerbotAIConfig.buyReagentsStack; ++n)
+                if (!BuyItem(items, guid, proto))
+                    break;
+                else
+                    bought = true;
+        }
+    }
+
+    return bought;
 }

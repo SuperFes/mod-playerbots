@@ -7,6 +7,8 @@
 #ifndef PLAYERBOTS_BUYACTION_H
 #define PLAYERBOTS_BUYACTION_H
 
+#include <set>
+
 #include "InventoryAction.h"
 
 class FindItemVisitor;
@@ -25,10 +27,29 @@ public:
 
     bool Execute(Event event) override;
 
-private:
+protected:
     bool BuyItem(VendorItemData const* tItems, ObjectGuid vendorguid, ItemTemplate const* proto);
+
+private:
     bool TradeItem(FindItemVisitor* visitor, int8 slot);
     bool TradeItem(Item const* item, int8 slot);
+};
+
+// Restocking consumables at a vendor: spell reagents for any class that needs them, plus ammo.
+// Bots already notice and announce being out of reagents - nothing has ever refilled them, so a
+// priest would tell you about its missing candles indefinitely.
+class BuyReagentsAction : public BuyAction
+{
+public:
+    BuyReagentsAction(PlayerbotAI* botAI) : BuyAction(botAI) {}
+
+    std::string const getName() override { return "buy reagents"; }
+    bool isUseful() override;
+    bool Execute(Event event) override;
+
+private:
+    // Reagent item ids for known spells the bot currently cannot cast for want of them.
+    std::set<uint32> FindMissingReagents() const;
 };
 
 #endif

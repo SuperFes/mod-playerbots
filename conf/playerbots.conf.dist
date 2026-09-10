@@ -490,6 +490,24 @@ AiPlayerbot.AmbientSay = 1
 # Uses the same item classification as the sell command, so nothing the bot may still want is sold.
 AiPlayerbot.VendorDeclutter = 1
 
+# Bots restock spell reagents at a vendor when the group is stopped next to one. They already
+# notice and announce being out - without this nothing ever refills them, so a priest complains
+# about missing candles indefinitely. Like decluttering, this never makes a bot walk anywhere.
+AiPlayerbot.BuyReagents = 1
+
+# How many of each missing reagent to buy in one visit. Capped at 60.
+AiPlayerbot.BuyReagentsStack = 20
+
+# Bots list surplus gear at an auctioneer instead of vendoring it. ItemUsageValue already separates
+# "worth a vendor's copper" from "worth listing"; without this both were sold to the vendor.
+# Like the other vendor work, bots never walk to an auctioneer - one has to already be in range.
+AiPlayerbot.AuctionSurplus = 1
+
+# How many items a bot lists in one visit, and what it asks relative to vendor price. There is no
+# market history server-side, so price is anchored on vendor value. Multiplier is clamped to >= 1.
+AiPlayerbot.AuctionMaxPerVisit = 5
+AiPlayerbot.AuctionPriceMultiplier = 3.0
+
 # While you are parked in a capital city, bots stop shadowing you and get on with their own
 # business - wandering, crafting, selling junk, sitting down. The moment you leave, by any means,
 # they say so and teleport to you. Autonomy only ever happens while you are in the city too, so
@@ -500,6 +518,19 @@ AiPlayerbot.CityAutonomy = 1
 # How far from you a bot will drift while pottering. Beyond this it heads back rather than
 # wandering further, so you never have to go looking for one. Minimum 20.
 AiPlayerbot.CityAutonomyRadius = 80
+
+# How long you must be stopped before bots consider you parked rather than passing through.
+# Without this they would peel off the moment you crossed a city boundary - flying into Shattrath
+# would leave them sitting at the border.
+AiPlayerbot.CityAutonomySettleSeconds = 15
+
+# How often a pottering bot walks towards a vendor rather than ambling at random. Purely random
+# movement reads as broken; purely errand-running reads as scripted. Each bot's own personality
+# biases this, so some are visibly more purposeful than others. Range is how far it will look for
+# one, and Seconds is how long it keeps heading there before picking something else to do.
+AiPlayerbot.CityErrandChance = 0.45
+AiPlayerbot.CityErrandRange = 250
+AiPlayerbot.CityErrandSeconds = 45
 
 #
 #

@@ -37,7 +37,8 @@ void MountStrategy::InitTriggers(std::vector<TriggerNode*>& /*triggers*/)
 void TradeskillStrategy::InitTriggers(std::vector<TriggerNode*>& triggers)
 {
     if (!sPlayerbotAIConfig.tradeskillWhenIdle && !sPlayerbotAIConfig.idleSit &&
-        !sPlayerbotAIConfig.utilityCallouts && !sPlayerbotAIConfig.vendorDeclutter)
+        !sPlayerbotAIConfig.utilityCallouts && !sPlayerbotAIConfig.vendorDeclutter &&
+        !sPlayerbotAIConfig.buyReagents && !sPlayerbotAIConfig.auctionSurplus)
         return;
 
     // Low relevance throughout: anything the bot could be doing instead should win. These only get a
@@ -56,6 +57,14 @@ void TradeskillStrategy::InitTriggers(std::vector<TriggerNode*>& triggers)
         triggers.push_back(new TriggerNode("party member dead", { NextAction("battle rez callout", 12.0f) }));
         triggers.push_back(new TriggerNode("bot idle", { NextAction("utility callout", 2.0f) }));
     }
+
+    // Listing beats vendoring, which beats sitting down.
+    if (sPlayerbotAIConfig.auctionSurplus)
+        triggers.push_back(new TriggerNode("bot idle", { NextAction("auction surplus", 1.7f) }));
+
+    // Restocking beats selling: being unable to cast a group buff matters more than bag space.
+    if (sPlayerbotAIConfig.buyReagents)
+        triggers.push_back(new TriggerNode("bot idle", { NextAction("buy reagents", 1.6f) }));
 
     // Standing at a vendor with a bag of greys is the obvious moment to clear them out.
     if (sPlayerbotAIConfig.vendorDeclutter)

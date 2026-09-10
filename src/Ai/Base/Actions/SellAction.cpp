@@ -51,7 +51,9 @@ public:
     bool Visit(Item* item) override
     {
         ItemUsage usage = context->GetValue<ItemUsage>("item usage", item->GetEntry())->Get();
-        if (usage != ITEM_USAGE_VENDOR && usage != ITEM_USAGE_AH)
+        // ITEM_USAGE_AH is deliberately excluded: those are worth listing, and AuctionSurplusAction
+        // handles them. Vendoring them would throw away the difference.
+        if (usage != ITEM_USAGE_VENDOR)
             return true;
 
         return SellItemsVisitor::Visit(item);

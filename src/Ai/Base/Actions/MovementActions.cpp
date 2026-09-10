@@ -6,6 +6,8 @@
 
 #include "MovementActions.h"
 
+#include "CityVendorMgr.h"
+
 #include <cmath>
 #include <cstdlib>
 #include <iomanip>
@@ -3017,11 +3019,46 @@ bool CityWanderAction::Execute(Event event)
     // Loose leash. Bots drift around town but not out of it, so the master never has to go looking.
     if (bot->GetExactDist2d(master) > sPlayerbotAIConfig.cityAutonomyRadius)
     {
+        _targetUntil = 0;
+
         return MoveTo(bot->GetMapId(), master->GetPositionX(), master->GetPositionY(),
                       master->GetPositionZ(), false, false, false, true,
                       MovementPriority::MOVEMENT_NORMAL);
     }
 
+    time_t const now = time(nullptr);
+
+    // Still heading somewhere, and not there yet.
+    if (now < _targetUntil && bot->GetExactDist2d(_targetX, _targetY) > INTERACTION_DISTANCE)
+    {
+        return MoveTo(bot->GetMapId(), _targetX, _targetY, _targetZ, false, false, false, true,
+                      MovementPriority::MOVEMENT_NORMAL);
+    }
+
+    _targetUntil = 0;
+
+    // Some of the time head for a shop, the rest just amble. Purely random movement reads as broken
+    // and purely errand-running reads as scripted, so bots do both. The share is biased per bot from
+    // the personality seed, so one is visibly more purposeful than another.
+    float const errandChance =
+        sPlayerbotAIConfig.cityErrandChance * botAI->GetPersonality().reactionScale;
+
+    if (frand(0.0f, 1.0f) < errandChance)
+    {
+        CityVendorMgr::Spot spot;
+        if (sCityVendorMgr->PickNearby(bot, sPlayerbotAIConfig.cityErrandRange, spot))
+        {
+            _targetX = spot.x;
+            _targetY = spot.y;
+            _targetZ = spot.z;
+            _targetUntil = now + sPlayerbotAIConfig.cityErrandSeconds;
+
+            return MoveTo(bot->GetMapId(), _targetX, _targetY, _targetZ, false, false, false, true,
+                          MovementPriority::MOVEMENT_NORMAL);
+        }
+    }
+
+    // No vendor in range, or this bot fancied a wander instead.
     return MoveRandomAction::Execute(event);
 }
 

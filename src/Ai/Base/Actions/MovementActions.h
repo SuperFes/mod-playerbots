@@ -259,6 +259,13 @@ public:
 
     bool isUseful() override;
     bool Execute(Event event) override;
+
+private:
+    // A destination held across ticks, so the bot walks somewhere rather than twitching in place.
+    float _targetX = 0.0f;
+    float _targetY = 0.0f;
+    float _targetZ = 0.0f;
+    time_t _targetUntil = 0;
 };
 
 // Master has left the city, on foot or otherwise. Say so and catch up.

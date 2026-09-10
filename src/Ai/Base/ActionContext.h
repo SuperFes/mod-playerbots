@@ -14,6 +14,7 @@
 #include "AutoMaintenanceOnLevelupAction.h"
 #include "BattleGroundJoinAction.h"
 #include "BattleGroundTactics.h"
+#include "AuctionAction.h"
 #include "BuyAction.h"
 #include "CastCustomSpellAction.h"
 #include "ChangeStrategyAction.h"
@@ -148,6 +149,8 @@ public:
         creators["utility callout"] = &ActionContext::utility_callout;
         creators["ambient say"] = &ActionContext::ambient_say;
         creators["vendor declutter"] = &ActionContext::vendor_declutter;
+        creators["buy reagents"] = &ActionContext::buy_reagents;
+        creators["auction surplus"] = &ActionContext::auction_surplus;
         creators["city wander"] = &ActionContext::city_wander;
         creators["rejoin master"] = &ActionContext::rejoin_master;
         creators["battle rez callout"] = &ActionContext::battle_rez_callout;
@@ -351,6 +354,8 @@ private:
     static Action* utility_callout(PlayerbotAI* botAI) { return new UtilityCalloutAction(botAI); }
     static Action* ambient_say(PlayerbotAI* botAI) { return new AmbientSayAction(botAI); }
     static Action* vendor_declutter(PlayerbotAI* botAI) { return new VendorDeclutterAction(botAI); }
+    static Action* buy_reagents(PlayerbotAI* botAI) { return new BuyReagentsAction(botAI); }
+    static Action* auction_surplus(PlayerbotAI* botAI) { return new AuctionSurplusAction(botAI); }
     static Action* city_wander(PlayerbotAI* botAI) { return new CityWanderAction(botAI); }
     static Action* rejoin_master(PlayerbotAI* botAI) { return new RejoinMasterAction(botAI); }
     static Action* battle_rez_callout(PlayerbotAI* botAI) { return new BattleRezCalloutAction(botAI); }

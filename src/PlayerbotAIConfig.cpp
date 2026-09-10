@@ -11,6 +11,7 @@
 #include <iostream>
 #include "AmbitionMgr.h"
 #include "BotAppearanceMgr.h"
+#include "CityVendorMgr.h"
 #include "BisListMgr.h"
 #include "Config.h"
 #include "NewRpgInfo.h"
@@ -138,9 +139,20 @@ bool PlayerbotAIConfig::Initialize()
     utilityCallouts = sConfigMgr->GetOption<bool>("AiPlayerbot.UtilityCallouts", true);
     ambientSay = sConfigMgr->GetOption<bool>("AiPlayerbot.AmbientSay", true);
     vendorDeclutter = sConfigMgr->GetOption<bool>("AiPlayerbot.VendorDeclutter", true);
+    auctionSurplus = sConfigMgr->GetOption<bool>("AiPlayerbot.AuctionSurplus", true);
+    auctionMaxPerVisit = sConfigMgr->GetOption<uint32>("AiPlayerbot.AuctionMaxPerVisit", 5);
+    auctionPriceMultiplier =
+        std::max(1.0f, sConfigMgr->GetOption<float>("AiPlayerbot.AuctionPriceMultiplier", 3.0f));
+    buyReagents = sConfigMgr->GetOption<bool>("AiPlayerbot.BuyReagents", true);
+    buyReagentsStack = std::min<uint32>(60u, sConfigMgr->GetOption<uint32>("AiPlayerbot.BuyReagentsStack", 20));
     cityAutonomy = sConfigMgr->GetOption<bool>("AiPlayerbot.CityAutonomy", true);
     cityAutonomyRadius =
         std::max(20.0f, sConfigMgr->GetOption<float>("AiPlayerbot.CityAutonomyRadius", 80.0f));
+    cityAutonomySettleSeconds = sConfigMgr->GetOption<uint32>("AiPlayerbot.CityAutonomySettleSeconds", 15);
+    cityErrandChance =
+        std::clamp(sConfigMgr->GetOption<float>("AiPlayerbot.CityErrandChance", 0.45f), 0.0f, 1.0f);
+    cityErrandRange = std::max(20.0f, sConfigMgr->GetOption<float>("AiPlayerbot.CityErrandRange", 250.0f));
+    cityErrandSeconds = sConfigMgr->GetOption<uint32>("AiPlayerbot.CityErrandSeconds", 45);
 
     criticalHealth = sConfigMgr->GetOption<int32>("AiPlayerbot.CriticalHealth", 25);
     lowHealth = sConfigMgr->GetOption<int32>("AiPlayerbot.LowHealth", 45);
@@ -783,6 +795,7 @@ bool PlayerbotAIConfig::Initialize()
     sBisListMgr->LoadAll();
     sAmbitionMgr->LoadAll();
     sBotAppearanceMgr->LoadAll();
+    sCityVendorMgr->LoadAll();
     PlayerbotTextMgr::instance().LoadBotTexts();
     PlayerbotTextMgr::instance().LoadBotTextChance();
     PlayerbotFactory::Init();
