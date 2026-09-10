@@ -19,6 +19,20 @@ public:
     bool IsActive() override;
 };
 
+// A bot that belongs to a dungeon-finder group but is not in its dungeon.
+//
+// LFGMgr::MakeNewGroup teleports the whole group in when the queue pops, but LFGMgr::TeleportPlayer
+// refuses while a player is dead, falling, mid-jump, in combat, fatigued or on a vehicle - and
+// nothing ever retries. A bot that happened to be jumping down a step at the moment the queue popped
+// is simply left standing where it was, with the rest of the party inside.
+class OutsideLfgDungeonTrigger : public Trigger
+{
+public:
+    OutsideLfgDungeonTrigger(PlayerbotAI* botAI) : Trigger(botAI, "outside lfg dungeon", 5 * 1000) {}
+
+    bool IsActive() override;
+};
+
 class UnknownDungeonTrigger : public Trigger
 {
 public:

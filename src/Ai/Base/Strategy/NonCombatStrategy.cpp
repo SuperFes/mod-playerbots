@@ -20,6 +20,10 @@ void NonCombatStrategy::InitTriggers(std::vector<TriggerNode*>& triggers)
     // Above follow: the master has left town and the bot needs to catch up before anything else.
     triggers.push_back(new TriggerNode("often", { NextAction("rejoin master", 70.0f) }));
 
+    // Above that again: being left outside your own dungeon-finder group's instance beats every
+    // other errand, and the LFG path is the only one that enters an instance correctly.
+    triggers.push_back(new TriggerNode("outside lfg dungeon", { NextAction("lfg enter dungeon", 75.0f) }));
+
     // Below everything: pottering about town is what a bot does when nothing else wants a tick.
     triggers.push_back(new TriggerNode("often", { NextAction("city wander", 0.6f) }));
 }

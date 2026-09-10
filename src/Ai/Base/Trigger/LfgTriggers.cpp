@@ -6,9 +6,32 @@
 
 #include "LfgTriggers.h"
 
+#include "Group.h"
+#include "LFGMgr.h"
+
 #include "Playerbots.h"
 
 bool LfgProposalActiveTrigger::IsActive() { return AI_VALUE(uint32, "lfg proposal"); }
+
+bool OutsideLfgDungeonTrigger::IsActive()
+{
+    Group* group = bot->GetGroup();
+    if (!group || !group->isLFGGroup())
+        return false;
+
+    ObjectGuid const gguid = group->GetGUID();
+    if (sLFGMgr->GetState(gguid) != lfg::LFG_STATE_DUNGEON)
+        return false;
+
+    uint32 const mapId = sLFGMgr->GetDungeonMapId(gguid);
+    if (!mapId || bot->GetMapId() == mapId)
+        return false;
+
+    // Only ask again once the conditions that made the automatic teleport fail have cleared,
+    // otherwise every retry earns another refusal.
+    return bot->IsAlive() && !bot->IsInCombat() && !bot->IsFalling() &&
+           !bot->HasUnitState(UNIT_STATE_JUMPING) && !bot->GetVehicle() && !bot->IsBeingTeleported();
+}
 
 bool UnknownDungeonTrigger::IsActive()
 {

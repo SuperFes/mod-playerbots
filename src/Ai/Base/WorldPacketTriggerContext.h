@@ -63,6 +63,7 @@ public:
         creators["guild invite"] = &WorldPacketTriggerContext::guild_invite;
         creators["petition offer"] = &WorldPacketTriggerContext::petition_offer;
         creators["lfg teleport"] = &WorldPacketTriggerContext::lfg_teleport;
+        creators["lfg teleport denied"] = &WorldPacketTriggerContext::lfg_teleport_denied;
         creators["inventory change failure"] = &WorldPacketTriggerContext::inventory_change_failure;
         creators["bg status"] = &WorldPacketTriggerContext::bg_status;
         creators["levelup"] = &WorldPacketTriggerContext::levelup;
@@ -81,6 +82,7 @@ private:
     static Trigger* inventory_change_failure(PlayerbotAI* botAI) { return new WorldPacketTrigger(botAI, "inventory change failure"); }
     static Trigger* guild_invite(PlayerbotAI* botAI) { return new WorldPacketTrigger(botAI, "guild invite"); }
     static Trigger* lfg_teleport(PlayerbotAI* botAI) { return new WorldPacketTrigger(botAI, "lfg teleport"); }
+    static Trigger* lfg_teleport_denied(PlayerbotAI* botAI) { return new WorldPacketTrigger(botAI, "lfg teleport denied"); }
     static Trigger* lfg_leave(PlayerbotAI* botAI) { return new WorldPacketTrigger(botAI, "lfg leave"); }
     static Trigger* lfg_proposal(PlayerbotAI* botAI) { return new WorldPacketTrigger(botAI, "lfg proposal"); }
     static Trigger* lfg_role_check(PlayerbotAI* botAI) { return new WorldPacketTrigger(botAI, "lfg role check"); }

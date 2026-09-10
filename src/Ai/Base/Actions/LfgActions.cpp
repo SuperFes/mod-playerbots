@@ -13,6 +13,7 @@
 #include "Playerbots.h"
 #include "World.h"
 #include "WorldPacket.h"
+#include "PlayerbotTextMgr.h"
 #include "RandomPlayerbotMgr.h"
 
 using namespace lfg;
@@ -194,75 +195,67 @@ bool LfgRoleCheckAction::Execute(Event /*event*/)
     return false;
 }
 
+bool LfgAcceptAction::WouldAbandonMaster() const
+{
+    Group* group = bot->GetGroup();
+
+    if (!group || group->isLFGGroup())
+        return false;
+
+    if (!botAI->HasRealPlayerMaster() || !group->IsMember(botAI->GetMaster()->GetGUID()))
+        return false;
+
+    // If the party queued together the proposal is for all of us, and accepting is what keeps us
+    // together. Only a leftover solo queue entry - the bot was queued before being invited, and
+    // LFGGroupScript::OnAddMember only clears those still in LFG_STATE_QUEUED - pulls it away.
+    return sLFGMgr->GetState(group->GetGUID()) == LFG_STATE_NONE;
+}
+
+bool LfgAcceptAction::AnswerProposal(uint32 id, bool accept)
+{
+    botAI->GetAiObjectContext()->GetValue<uint32>("lfg proposal")->Set(0);
+
+    if (accept)
+        bot->ClearUnitState(UNIT_STATE_ALL_STATE);
+
+    WorldPacket* packet = new WorldPacket(CMSG_LFG_PROPOSAL_RESULT);
+    *packet << id << accept;
+    bot->GetSession()->QueuePacket(packet);
+
+    if (!accept)
+        return true;
+
+    if (RandomPlayerbotMgr::instance().IsRandomBot(bot) && !bot->GetGroup())
+    {
+        RandomPlayerbotMgr::instance().Refresh(bot);
+        botAI->ResetStrategies();
+    }
+
+    botAI->Reset();
+    return true;
+}
+
 bool LfgAcceptAction::Execute(Event event)
 {
     uint32 id = AI_VALUE(uint32, "lfg proposal");
 
-    // Try accept if already stored
-    if (id)
-    {
-        if (bot->IsInCombat() || bot->isDead())
-        {
-            WorldPacket* packet = new WorldPacket(CMSG_LFG_PROPOSAL_RESULT);
-            *packet << id << false;
-            bot->GetSession()->QueuePacket(packet);
-            return true;
-        }
-
-        botAI->GetAiObjectContext()->GetValue<uint32>("lfg proposal")->Set(0);
-        bot->ClearUnitState(UNIT_STATE_ALL_STATE);
-
-        WorldPacket* packet = new WorldPacket(CMSG_LFG_PROPOSAL_RESULT);
-        *packet << id << true;
-        bot->GetSession()->QueuePacket(packet);
-
-        if (RandomPlayerbotMgr::instance().IsRandomBot(bot) && !bot->GetGroup())
-        {
-            RandomPlayerbotMgr::instance().Refresh(bot);
-            botAI->ResetStrategies();
-        }
-
-        botAI->Reset();
-        return true;
-    }
-
-    // If we get the proposal packet, accept immediately
-    if (!event.getPacket().empty())
+    // Nothing stored - take the id straight off the proposal packet.
+    if (!id && !event.getPacket().empty())
     {
         WorldPacket p(event.getPacket());
         uint32 dungeonId;
         uint8 state;
         p >> dungeonId >> state >> id;
-
-        if (id)
-        {
-            if (bot->IsInCombat() || bot->isDead())
-            {
-                WorldPacket* packet = new WorldPacket(CMSG_LFG_PROPOSAL_RESULT);
-                *packet << id << false;
-                bot->GetSession()->QueuePacket(packet);
-                return true;
-            }
-
-            botAI->GetAiObjectContext()->GetValue<uint32>("lfg proposal")->Set(0);
-            bot->ClearUnitState(UNIT_STATE_ALL_STATE);
-
-            WorldPacket* packet = new WorldPacket(CMSG_LFG_PROPOSAL_RESULT);
-            *packet << id << true;
-            bot->GetSession()->QueuePacket(packet);
-
-            if (RandomPlayerbotMgr::instance().IsRandomBot(bot) && !bot->GetGroup())
-            {
-                RandomPlayerbotMgr::instance().Refresh(bot);
-                botAI->ResetStrategies();
-            }
-
-            botAI->Reset();
-            return true;
-        }
     }
 
-    return false;
+    if (!id)
+        return false;
+
+    // Decline rather than ignore: the rest of the proposal waits out the full 40 second timeout
+    // otherwise, and everyone in it eats a decline cooldown for a bot that was never going to come.
+    bool const accept = !bot->IsInCombat() && !bot->isDead() && !WouldAbandonMaster();
+
+    return AnswerProposal(id, accept);
 }
 
 bool LfgLeaveAction::Execute(Event /*event*/)
@@ -283,6 +276,15 @@ bool LfgLeaveAction::Execute(Event /*event*/)
 
 bool LfgLeaveAction::isUseful() { return true; }
 
+void LfgTeleportAction::RequestTeleport(bool out)
+{
+    bot->ClearUnitState(UNIT_STATE_ALL_STATE);
+
+    WorldPacket* packet = new WorldPacket(CMSG_LFG_TELEPORT);
+    *packet << out;
+    bot->GetSession()->QueuePacket(packet);
+}
+
 bool LfgTeleportAction::Execute(Event event)
 {
     bool out = false;
@@ -294,12 +296,71 @@ bool LfgTeleportAction::Execute(Event event)
         p >> out;
     }
 
-    bot->ClearUnitState(UNIT_STATE_ALL_STATE);
+    RequestTeleport(out);
 
-    WorldPacket* packet = new WorldPacket(CMSG_LFG_TELEPORT);
-    *packet << out;
-    bot->GetSession()->QueuePacket(packet);
-    // sLFGMgr->TeleportPlayer(bot, out);
+    return true;
+}
+
+bool LfgEnterDungeonAction::Execute(Event /*event*/)
+{
+    // Stop wherever we are first: the teleport is refused outright while falling or mid-jump, and a
+    // bot that is still running its follow path can be back in the air by the time this is handled.
+    if (bot->GetMotionMaster())
+        bot->GetMotionMaster()->Clear(true);
+
+    bot->StopMoving();
+
+    RequestTeleport(false);
+
+    return true;
+}
+
+namespace
+{
+    char const* TeleportDeniedReason(uint32 err)
+    {
+        switch (err)
+        {
+            case lfg::LFG_TELEPORTERROR_PLAYER_DEAD:
+                return "I am dead";
+            case lfg::LFG_TELEPORTERROR_FALLING:
+                return "I am still falling";
+            case lfg::LFG_TELEPORTERROR_IN_VEHICLE:
+                return "I am stuck on a vehicle";
+            case lfg::LFG_TELEPORTERROR_FATIGUE:
+                return "I am out of breath";
+            case lfg::LFG_TELEPORTERROR_INVALID_LOCATION:
+                return "the way in is closed to me";
+            case lfg::LFG_TELEPORTERROR_COMBAT:
+                return "I am still in combat";
+            default:
+                return "the way in was refused";
+        }
+    }
+}
+
+bool LfgTeleportDeniedAction::Execute(Event event)
+{
+    WorldPacket p(event.getPacket());
+    if (p.empty())
+        return false;
+
+    p.rpos(0);
+    uint32 err = 0;
+    p >> err;
+
+    // The retry trigger fires every few seconds; only one of those refusals is worth hearing about.
+    time_t const now = time(nullptr);
+    if (_lastTold && now - _lastTold < 30)
+        return false;
+
+    _lastTold = now;
+
+    std::map<std::string, std::string> placeholders;
+    placeholders["%reason"] = TeleportDeniedReason(err);
+
+    botAI->SayToParty(PlayerbotTextMgr::instance().GetBotTextOrDefault(
+        "lfg_teleport_denied", "Cannot get in - %reason.", placeholders));
 
     return true;
 }
@@ -315,8 +376,9 @@ bool LfgJoinAction::isUseful()
     if (bot->GetLevel() < 15)
         return false;
 
-    // don't use if active player master
-    if (GET_PLAYERBOT_AI(bot)->IsRealPlayer())
+    // IsRealPlayer() only means "master is itself", so this used to let a bot serving a human queue
+    // for a dungeon behind their back, get a proposal, accept it and vanish into an instance.
+    if (botAI->HasRealPlayerMaster())
         return false;
 
     if (bot->GetGroup() && bot->GetGroup()->GetLeaderGUID() != bot->GetGUID())
