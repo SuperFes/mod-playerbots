@@ -161,24 +161,50 @@ bool ReturnAction::isUseful()
     return pos.isSet() && AI_VALUE2(float, "distance", "position_random") > sPlayerbotAIConfig.followDistance;
 }
 
+bool ReturnToStayPositionAction::isUseful()
+{
+    // Holding a post and roaming a city freely are contradictory: whatever left a stay position on
+    // this bot, it is not what the bot is doing right now.
+    if (botAI->IsCityAutonomyActive())
+        return false;
+
+    return MoveToPositionAction::isUseful();
+}
+
 bool ReturnToStayPositionAction::isPossible()
+{
+    // A predicate only. This used to whisper the master and rewrite the stay position from in here,
+    // but the engine calls isPossible() while merely weighing actions it may never run - so a bot
+    // announced that it was staying put while it was in fact following, and re-anchored itself as a
+    // side effect of being thought about.
+    return AI_VALUE(PositionMap&, "position")["stay"].isSet();
+}
+
+bool ReturnToStayPositionAction::Execute(Event event)
 {
     PositionMap& posMap = AI_VALUE(PositionMap&, "position");
     PositionInfo stayPosition = posMap["stay"];
-    if (stayPosition.isSet())
-    {
-        const float distance = bot->GetDistance(stayPosition.x, stayPosition.y, stayPosition.z);
-        if (distance > sPlayerbotAIConfig.reactDistance)
-        {
-            botAI->TellMaster("The stay position is too far to return. I am going to stay where I am now");
+    if (!stayPosition.isSet())
+        return false;
 
-            // Set the stay position to current position
-            stayPosition.Set(bot->GetPositionX(), bot->GetPositionY(), bot->GetPositionZ(), bot->GetMapId());
-            posMap["stay"] = stayPosition;
-        }
+    // On another map the coordinates are not far away, they are meaningless - GetDistance would be
+    // comparing positions from two different coordinate spaces.
+    bool const otherMap = stayPosition.mapId != bot->GetMapId();
+    bool const tooFar = otherMap ||
+        bot->GetDistance(stayPosition.x, stayPosition.y, stayPosition.z) > sPlayerbotAIConfig.reactDistance;
 
-        return true;
-    }
+    if (!tooFar)
+        return MoveToPositionAction::Execute(event);
 
-    return false;
+    LOG_DEBUG("playerbots", "Bot {} abandoning stay position ({}, {}, {} on map {}) - {} away, on {} map",
+              bot->GetName(), stayPosition.x, stayPosition.y, stayPosition.z, stayPosition.mapId,
+              otherMap ? -1.0f : bot->GetDistance(stayPosition.x, stayPosition.y, stayPosition.z),
+              otherMap ? "a different" : "the same");
+
+    stayPosition.Set(bot->GetPositionX(), bot->GetPositionY(), bot->GetPositionZ(), bot->GetMapId());
+    posMap["stay"] = stayPosition;
+
+    botAI->TellMaster("The stay position is too far to return. I am going to stay where I am now");
+
+    return true;
 }

@@ -45,7 +45,10 @@ class ReturnToStayPositionAction : public MoveToPositionAction
 {
 public:
     ReturnToStayPositionAction(PlayerbotAI* ai) : MoveToPositionAction(ai, "move to position", "stay") {}
-    virtual bool isPossible();
+
+    bool isUseful() override;
+    bool isPossible() override;
+    bool Execute(Event event) override;
 };
 
 class SetReturnPositionAction : public Action

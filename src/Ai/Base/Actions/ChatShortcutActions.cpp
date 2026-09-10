@@ -78,7 +78,10 @@ bool FollowChatShortcutAction::Execute(Event /*event*/)
         return false;
 
     // botAI->Reset();
-    botAI->ChangeStrategy("+follow,-passive,-grind,-move from group", BOT_STATE_NON_COMBAT);
+    // -stay belongs on both lines. Leaving it set out of combat meant a bot told to follow kept the
+    // stay strategy, and anything that re-anchors a stay position (SeeSpellAction does) brought the
+    // whole return-to-stay behaviour back from the dead.
+    botAI->ChangeStrategy("+follow,-stay,-passive,-grind,-move from group", BOT_STATE_NON_COMBAT);
     botAI->ChangeStrategy("-stay,-follow,-passive,-grind,-move from group", BOT_STATE_COMBAT);
     botAI->GetAiObjectContext()->GetValue<GuidVector>("prioritized targets")->Reset();
 
