@@ -123,7 +123,13 @@ public:
     float auctionPriceMultiplier;
     bool buyReagents;
     uint32 buyReagentsStack;
+    bool mountBeforeRejoin;
+    uint32 rejoinMountSeconds;
+    bool followMasterAcrossMaps;
+    uint32 crossMapRejoinSeconds;
     bool cityAutonomy;
+    float cityRoamRadius;
+    uint32 cityRejoinConfirmSeconds;
     float cityAutonomyRadius;
     uint32 cityAutonomySettleSeconds;
     float cityErrandChance, cityErrandRange;

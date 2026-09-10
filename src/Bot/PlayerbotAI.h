@@ -457,6 +457,9 @@ public:
     const AreaTableEntry* GetCurrentArea();
     const AreaTableEntry* GetCurrentZone();
     static std::string GetLocalizedAreaName(const AreaTableEntry* entry);
+    // The bot's current zone, named. Every text pool row is entitled to assume %zone_name resolves,
+    // so callers that pass an empty placeholder map leak the token verbatim into chat.
+    std::string GetZoneName();
     static std::string GetLocalizedCreatureName(uint32 entry);
     static std::string GetLocalizedGameObjectName(uint32 entry);
     bool TellMaster(std::ostringstream& stream, PlayerbotSecurityLevel securityLevel = PLAYERBOT_SECURITY_ALLOW_ALL);
@@ -623,11 +626,22 @@ public:
     // business. The instant the master leaves - on foot, by flight, or onto a boat - autonomy ends
     // and the bot rejoins. That keeps the out-of-range window to seconds, which matters because
     // MaxGroupXPDistance (74y) gates XP, quest credit and loot on proximity.
-    bool IsCityAutonomyActive();
+    bool IsCityAutonomyActive() const { return _cityAutonomyActive; }
 
     // Peek and clear are separate so isUseful() stays free of side effects.
+    // A boat, zeppelin or tram - something that carries the player away. A city lift is also a
+    // transport as far as GetTransport() is concerned, but riding one is not leaving town.
+    static bool IsLeavingOnTransport(Player* player);
+
+    // Where the group parked, for bots roaming a city. False when no roam is in progress.
+    bool GetCityAnchor(float& x, float& y, float& z) const;
     bool IsCityRejoinPending() const { return _cityRejoinPending; }
     void ClearCityRejoin() { _cityRejoinPending = false; }
+
+    // Seconds the master has been on a different map. Follow cannot cross maps at all - the code
+    // that would have done it is commented out in MovementAction::Follow - so without this a bot
+    // whose master stepped through a portal simply stands there.
+    uint32 GetMasterMapMismatchSeconds() const;
 
     std::vector<const Quest*> GetAllCurrentQuests();
     std::vector<const Quest*> GetCurrentIncompleteQuests();
@@ -693,8 +707,19 @@ protected:
     BotPersonality _personality;
     time_t _lastActiveTime = 0;
     time_t _masterMovingTime = 0;
+    time_t _masterMapMismatchSince = 0;
+    // The instantaneous test. IsCityAutonomyActive() reports the latched decision instead, so a
+    // momentary dip - a lift, a stray mob, a step across a zone seam - does not reach the rest of
+    // the AI at all.
+    bool ComputeCityAutonomy();
+
     bool _cityAutonomyActive = false;
+    time_t _cityAutonomyLostAt = 0;
     bool _cityRejoinPending = false;
+    bool _cityAnchorSet = false;
+    float _cityAnchorX = 0.0f;
+    float _cityAnchorY = 0.0f;
+    float _cityAnchorZ = 0.0f;
 };
 
 #endif

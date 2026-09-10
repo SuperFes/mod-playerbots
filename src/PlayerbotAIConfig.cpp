@@ -145,13 +145,21 @@ bool PlayerbotAIConfig::Initialize()
         std::max(1.0f, sConfigMgr->GetOption<float>("AiPlayerbot.AuctionPriceMultiplier", 3.0f));
     buyReagents = sConfigMgr->GetOption<bool>("AiPlayerbot.BuyReagents", true);
     buyReagentsStack = std::min<uint32>(60u, sConfigMgr->GetOption<uint32>("AiPlayerbot.BuyReagentsStack", 20));
+    mountBeforeRejoin = sConfigMgr->GetOption<bool>("AiPlayerbot.MountBeforeRejoin", true);
+    rejoinMountSeconds = sConfigMgr->GetOption<uint32>("AiPlayerbot.RejoinMountSeconds", 6);
+    followMasterAcrossMaps = sConfigMgr->GetOption<bool>("AiPlayerbot.FollowMasterAcrossMaps", true);
+    crossMapRejoinSeconds = sConfigMgr->GetOption<uint32>("AiPlayerbot.CrossMapRejoinSeconds", 5);
     cityAutonomy = sConfigMgr->GetOption<bool>("AiPlayerbot.CityAutonomy", true);
     cityAutonomyRadius =
         std::max(20.0f, sConfigMgr->GetOption<float>("AiPlayerbot.CityAutonomyRadius", 80.0f));
     cityAutonomySettleSeconds = sConfigMgr->GetOption<uint32>("AiPlayerbot.CityAutonomySettleSeconds", 15);
+    cityRejoinConfirmSeconds = sConfigMgr->GetOption<uint32>("AiPlayerbot.CityRejoinConfirmSeconds", 8);
     cityErrandChance =
         std::clamp(sConfigMgr->GetOption<float>("AiPlayerbot.CityErrandChance", 0.45f), 0.0f, 1.0f);
     cityErrandRange = std::max(20.0f, sConfigMgr->GetOption<float>("AiPlayerbot.CityErrandRange", 250.0f));
+    // Must cover the errand range or a bot gets leashed home before reaching the vendor it picked.
+    cityRoamRadius = std::max(cityErrandRange,
+                              sConfigMgr->GetOption<float>("AiPlayerbot.CityRoamRadius", 400.0f));
     cityErrandSeconds = sConfigMgr->GetOption<uint32>("AiPlayerbot.CityErrandSeconds", 45);
 
     criticalHealth = sConfigMgr->GetOption<int32>("AiPlayerbot.CriticalHealth", 25);

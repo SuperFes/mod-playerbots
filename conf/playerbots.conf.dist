@@ -513,6 +513,25 @@ AiPlayerbot.AuctionPriceMultiplier = 3.0
 # they say so and teleport to you. Autonomy only ever happens while you are in the city too, so
 # the out-of-range window is seconds: MaxGroupXPDistance (74 yards, worldserver.conf) gates XP,
 # quest credit and loot on proximity, and nothing is missed while the group is parked.
+# Get a mount under the bot before it teleports to its master, matching whatever the master is
+# riding. Without this a bot sent to a flying master arrives with nothing underneath it, falls, and
+# mounts somewhere on the way down.
+AiPlayerbot.MountBeforeRejoin = 1
+
+# How long to spend trying before giving up and travelling as-is. Covers the bot being indoors,
+# too low level to ride, or owning no mount at all.
+AiPlayerbot.RejoinMountSeconds = 6
+
+# Bots teleport to their master when he changes map - into an instance, through a portal, onto
+# another continent. Following cannot cross maps at all, and the area trigger at a portal only
+# fires for a bot that physically walks into it, so a bot even slightly behind is stranded with
+# nothing to recover it. Only applies to grouped bots with a real player master.
+AiPlayerbot.FollowMasterAcrossMaps = 1
+
+# Grace period before that teleport, so a bot that is about to reach the portal walks through on
+# its own rather than being yanked.
+AiPlayerbot.CrossMapRejoinSeconds = 5
+
 AiPlayerbot.CityAutonomy = 1
 
 # How far from you a bot will drift while pottering. Beyond this it heads back rather than
@@ -524,12 +543,23 @@ AiPlayerbot.CityAutonomyRadius = 80
 # would leave them sitting at the border.
 AiPlayerbot.CityAutonomySettleSeconds = 15
 
+# How long the master has to look gone before the group gives up on the city and teleports to them.
+# Rejoining is a teleport, so it is worth being sure: a lift ride, a stray mob pulled in town or a
+# step across a zone seam all end autonomy for a moment without meaning the master has left.
+AiPlayerbot.CityRejoinConfirmSeconds = 8
+
 # How often a pottering bot walks towards a vendor rather than ambling at random. Purely random
 # movement reads as broken; purely errand-running reads as scripted. Each bot's own personality
 # biases this, so some are visibly more purposeful than others. Range is how far it will look for
 # one, and Seconds is how long it keeps heading there before picking something else to do.
 AiPlayerbot.CityErrandChance = 0.45
 AiPlayerbot.CityErrandRange = 250
+
+# How far bots may drift from the spot the group parked at while roaming a capital. Measured from
+# that fixed anchor, not from you, so walking around town does not drag them after you. Raised to
+# at least CityErrandRange automatically, or a bot would be leashed back before reaching the vendor
+# it set out for.
+AiPlayerbot.CityRoamRadius = 400
 AiPlayerbot.CityErrandSeconds = 45
 
 #

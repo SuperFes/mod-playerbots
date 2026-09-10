@@ -213,6 +213,7 @@ PlayerbotAI::PlayerbotAI(Player* bot)
     botOutgoingPacketHandlers.AddHandler(SMSG_BATTLEFIELD_STATUS, "bg status");
     botOutgoingPacketHandlers.AddHandler(SMSG_LFG_ROLE_CHECK_UPDATE, "lfg role check");
     botOutgoingPacketHandlers.AddHandler(SMSG_LFG_PROPOSAL_UPDATE, "lfg proposal");
+    botOutgoingPacketHandlers.AddHandler(SMSG_LFG_TELEPORT_DENIED, "lfg teleport denied");
     botOutgoingPacketHandlers.AddHandler(SMSG_TEXT_EMOTE, "receive text emote");
     botOutgoingPacketHandlers.AddHandler(SMSG_EMOTE, "receive emote");
     botOutgoingPacketHandlers.AddHandler(SMSG_LOOT_START_ROLL, "master loot roll");
@@ -279,17 +280,61 @@ void PlayerbotAI::UpdateAI(uint32 elapsed, bool minimal)
         _lastActiveTime = time(nullptr);
 
     // Autonomy must not start while the master is still travelling through, so track when they
-    // were last on the move.
-    if (currentMaster && (currentMaster->isMoving() || currentMaster->IsFlying() ||
-                          currentMaster->HasUnitState(UNIT_STATE_IN_FLIGHT) || currentMaster->GetTransport()))
+    // were last on the move. Being on a flying mount is not itself movement - a master who has flown
+    // in and come to a stop has arrived, whether or not they bothered to land.
+    if (currentMaster && (currentMaster->isMoving() ||
+                          currentMaster->HasUnitState(UNIT_STATE_IN_FLIGHT) ||
+                          IsLeavingOnTransport(currentMaster)))
         _masterMovingTime = time(nullptr);
 
-    // Edge-detect the end of city autonomy so the bot rejoins once rather than every tick.
-    bool const autonomyNow = IsCityAutonomyActive();
-    if (_cityAutonomyActive && !autonomyNow)
-        _cityRejoinPending = true;
+    // Track how long the master has been on another map, so a bot that fell behind at a portal can
+    // be brought over. Reset while either side is mid-teleport, or we would act on a transient.
+    if (currentMaster && HasActivePlayerMaster() && currentMaster->IsInWorld() &&
+        !currentMaster->IsBeingTeleported() && !bot->IsBeingTeleported())
+    {
+        if (bot->GetMapId() != currentMaster->GetMapId())
+        {
+            if (!_masterMapMismatchSince)
+                _masterMapMismatchSince = time(nullptr);
+        }
+        else
+            _masterMapMismatchSince = 0;
+    }
+    else
+        _masterMapMismatchSince = 0;
 
-    _cityAutonomyActive = autonomyNow;
+    // Autonomy is latched, not sampled. Rejoining teleports the whole group, so a dip in the
+    // instantaneous test has to persist before it counts as the master having actually left.
+    bool const autonomyNow = ComputeCityAutonomy();
+
+    if (autonomyNow)
+    {
+        // Roaming is anchored to where the group parked, not to the master. Anchoring it to the
+        // master meant the leash centre walked around with them, dragging the bots along behind.
+        if (!_cityAutonomyActive)
+        {
+            _cityAnchorX = bot->GetPositionX();
+            _cityAnchorY = bot->GetPositionY();
+            _cityAnchorZ = bot->GetPositionZ();
+            _cityAnchorSet = true;
+        }
+
+        _cityAutonomyActive = true;
+        _cityAutonomyLostAt = 0;
+    }
+    else if (_cityAutonomyActive)
+    {
+        if (!_cityAutonomyLostAt)
+            _cityAutonomyLostAt = time(nullptr);
+        else if (time(nullptr) - _cityAutonomyLostAt >=
+                 static_cast<time_t>(sPlayerbotAIConfig.cityRejoinConfirmSeconds))
+        {
+            _cityAutonomyActive = false;
+            _cityAutonomyLostAt = 0;
+            _cityAnchorSet = false;
+            _cityRejoinPending = true;
+        }
+    }
 
     // Handle cheat options (set bot health and power if cheats are enabled)
     if (bot->IsAlive() &&
@@ -4619,6 +4664,13 @@ Player* PlayerbotAI::FindNewMaster()
     return nullptr;
 }
 
+std::string PlayerbotAI::GetZoneName()
+{
+    AreaTableEntry const* zone = GetCurrentZone();
+    return zone ? GetLocalizedAreaName(zone)
+                : PlayerbotTextMgr::instance().GetBotText("string_unknown_area");
+}
+
 bool PlayerbotAI::HasRealPlayerMaster()
 {
     if (master)
@@ -6785,7 +6837,17 @@ std::set<uint32> PlayerbotAI::GetCurrentIncompleteQuestIds()
     return result;
 }
 
-bool PlayerbotAI::IsCityAutonomyActive()
+uint32 PlayerbotAI::GetMasterMapMismatchSeconds() const
+{
+    if (!_masterMapMismatchSince)
+        return 0;
+
+    time_t const now = time(nullptr);
+
+    return now > _masterMapMismatchSince ? static_cast<uint32>(now - _masterMapMismatchSince) : 0;
+}
+
+bool PlayerbotAI::ComputeCityAutonomy()
 {
     if (!sPlayerbotAIConfig.cityAutonomy)
         return false;
@@ -6798,14 +6860,20 @@ bool PlayerbotAI::IsCityAutonomyActive()
     if (bot->IsInCombat() || master->IsInCombat() || currentState == BOT_STATE_COMBAT)
         return false;
 
-    // IsInFlight() is only UNIT_STATE_IN_FLIGHT, i.e. a taxi - it does not cover a flying mount,
-    // which is how bots ended up sitting at the Shattrath border while the master flew in.
-    if (master->IsFlying() || master->HasUnitState(UNIT_STATE_IN_FLIGHT) || master->GetTransport())
+    // A taxi cannot be parked and a transport moves underneath you, so neither ever counts as being
+    // in town. A flying mount is not in that class: flying in and stopping is arriving. What keeps a
+    // master who is merely passing overhead from scattering the group is the settle timer below,
+    // which is the check that actually distinguishes arriving from transiting.
+    if (master->HasUnitState(UNIT_STATE_IN_FLIGHT) || IsLeavingOnTransport(master))
         return false;
 
     // Only once the master has actually stopped. Passing through a capital is not parking in it.
-    if (!_masterMovingTime ||
-        time(nullptr) - _masterMovingTime < static_cast<time_t>(sPlayerbotAIConfig.cityAutonomySettleSeconds))
+    // Entry condition only: sustaining it meant every step the master took in town ended autonomy,
+    // which set the rejoin flag and teleported the whole group back. Once we are parked, we stay
+    // parked until the master genuinely leaves.
+    if (!_cityAutonomyActive &&
+        (!_masterMovingTime ||
+         time(nullptr) - _masterMovingTime < static_cast<time_t>(sPlayerbotAIConfig.cityAutonomySettleSeconds)))
         return false;
 
     if (bot->GetMapId() != master->GetMapId())
@@ -6824,6 +6892,33 @@ bool PlayerbotAI::IsCityAutonomyActive()
     // has to be near the master to begin. Once wandering it may drift out to CityAutonomyRadius.
     if (!_cityAutonomyActive && bot->GetExactDist2d(master) > sPlayerbotAIConfig.cityAutonomyRadius)
         return false;
+
+    return true;
+}
+
+bool PlayerbotAI::IsLeavingOnTransport(Player* player)
+{
+    Transport* transport = player ? player->GetTransport() : nullptr;
+    if (!transport)
+        return false;
+
+    // GAMEOBJECT_TYPE_MO_TRANSPORT: boats, zeppelins, the Deeprun Tram. These carry the player out
+    // of the zone, frequently off the map entirely.
+    //
+    // GAMEOBJECT_TYPE_TRANSPORT is the other kind - the lifts in Undercity, Thunder Bluff and
+    // Orgrimmar. They travel a few yards on a fixed track and set you down in the same city. Treating
+    // those as departure teleported the whole group on top of the master every time they took a lift.
+    return transport->IsMotionTransport();
+}
+
+bool PlayerbotAI::GetCityAnchor(float& x, float& y, float& z) const
+{
+    if (!_cityAnchorSet)
+        return false;
+
+    x = _cityAnchorX;
+    y = _cityAnchorY;
+    z = _cityAnchorZ;
 
     return true;
 }

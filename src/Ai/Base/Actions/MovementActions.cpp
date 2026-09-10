@@ -3012,17 +3012,20 @@ bool CityWanderAction::isUseful()
 
 bool CityWanderAction::Execute(Event event)
 {
-    Player* master = GetMaster();
-    if (!master)
+    if (!GetMaster())
         return false;
 
-    // Loose leash. Bots drift around town but not out of it, so the master never has to go looking.
-    if (bot->GetExactDist2d(master) > sPlayerbotAIConfig.cityAutonomyRadius)
+    // Keep them in town, not next to the master. The leash used to be measured from the master, so
+    // its centre moved as the master walked and the bots were dragged along - and at 80 yards it was
+    // tighter than the 250 yard errand range, so a bot heading for a vendor got hauled back before
+    // it arrived. Anchored to where the group parked, both problems go away.
+    float anchorX, anchorY, anchorZ;
+    if (botAI->GetCityAnchor(anchorX, anchorY, anchorZ) &&
+        bot->GetExactDist2d(anchorX, anchorY) > sPlayerbotAIConfig.cityRoamRadius)
     {
         _targetUntil = 0;
 
-        return MoveTo(bot->GetMapId(), master->GetPositionX(), master->GetPositionY(),
-                      master->GetPositionZ(), false, false, false, true,
+        return MoveTo(bot->GetMapId(), anchorX, anchorY, anchorZ, false, false, false, true,
                       MovementPriority::MOVEMENT_NORMAL);
     }
 
@@ -3064,11 +3067,66 @@ bool CityWanderAction::Execute(Event event)
 
 bool RejoinMasterAction::isUseful()
 {
-    if (!botAI->IsCityRejoinPending())
+    Player* master = GetMaster();
+    if (!master || bot->IsInCombat() || bot->IsBeingTeleported() || master->IsBeingTeleported())
         return false;
 
-    Player* master = GetMaster();
-    return master && !bot->IsInCombat();
+    // Left a city under our own steam.
+    if (botAI->IsCityRejoinPending())
+        return true;
+
+    // Or fell behind at a portal. Follow cannot cross maps, and the area trigger only fires for a
+    // bot that physically walks into it, so a bot even slightly behind is stranded with nothing to
+    // recover it. The grace period lets a bot that is about to hit the trigger do so on its own.
+    if (!sPlayerbotAIConfig.followMasterAcrossMaps)
+        return false;
+
+    // A dungeon-finder group has its own way in, which honours instance binding and lockouts.
+    // See OutsideLfgDungeonTrigger.
+    if (Group* group = bot->GetGroup(); group && group->isLFGGroup())
+        return false;
+
+    if (!botAI->HasActivePlayerMaster() || !bot->GetGroup())
+        return false;
+
+    return botAI->GetMasterMapMismatchSeconds() >= sPlayerbotAIConfig.crossMapRejoinSeconds;
+}
+
+bool RejoinMasterAction::ShouldMountBeforeRejoin(Player* master)
+{
+    if (!sPlayerbotAIConfig.mountBeforeRejoin)
+        return false;
+
+    // A master on foot, or one inside somewhere that forbids mounts, is nothing to match.
+    if (!master->IsMounted() && !master->IsFlying())
+        return false;
+
+    ShapeshiftForm const form = bot->GetShapeshiftForm();
+    if (bot->IsMounted() || form == FORM_FLIGHT || form == FORM_FLIGHT_EPIC || form == FORM_TRAVEL)
+    {
+        _mountingSince = 0;
+        return false;
+    }
+
+    time_t const now = time(nullptr);
+    if (!_mountingSince)
+        _mountingSince = now;
+    else if (now - _mountingSince >= sPlayerbotAIConfig.rejoinMountSeconds)
+    {
+        // No mount to be had - indoors, too low level, none learned. Go across on foot rather than
+        // stand about in town waiting for one.
+        _mountingSince = 0;
+        return false;
+    }
+
+    // Mounting is a cast that any movement cancels, and the bot may still be mid-errand.
+    if (bot->isMoving())
+        bot->StopMoving();
+
+    if (!bot->IsNonMeleeSpellCast(false))
+        botAI->DoSpecificAction("check mount state", Event(), true);
+
+    return true;
 }
 
 bool RejoinMasterAction::Execute(Event /*event*/)
@@ -3077,21 +3135,40 @@ bool RejoinMasterAction::Execute(Event /*event*/)
     if (!master)
         return false;
 
-    botAI->ClearCityRejoin();
+    bool const crossMap = bot->GetMapId() != master->GetMapId();
 
     // Already alongside them - nothing to announce, they never actually left us behind.
-    if (bot->GetMapId() == master->GetMapId() &&
-        bot->GetExactDist2d(master) <= sPlayerbotAIConfig.cityAutonomyRadius)
+    if (!crossMap && bot->GetExactDist2d(master) <= sPlayerbotAIConfig.cityAutonomyRadius)
+    {
+        botAI->ClearCityRejoin();
+        _mountingSince = 0;
         return false;
+    }
 
-    std::map<std::string, std::string> placeholders;
-    placeholders["%my_class"] = chat->FormatClass(bot->getClass());
+    // Only on the tick that starts the rejoin, or mounting up would repeat it every tick.
+    if (!_mountingSince)
+    {
+        std::map<std::string, std::string> placeholders;
+        placeholders["%my_class"] = chat->FormatClass(bot->getClass());
 
-    botAI->SayToParty(PlayerbotTextMgr::instance().GetBotTextOrDefault(
-        "city_rejoin", "Coming!", placeholders));
+        botAI->SayToParty(PlayerbotTextMgr::instance().GetBotTextOrDefault(
+            crossMap ? "cross_map_rejoin" : "city_rejoin", "Coming!", placeholders));
+    }
 
     if (bot->IsSitState())
         bot->SetStandState(UNIT_STAND_STATE_STAND);
+
+    // Arrive travelling the way the master is. Teleporting first and mounting afterwards drops the
+    // bot beside a flying master with nothing under it, so it falls out of the sky and mounts on the
+    // way down.
+    if (ShouldMountBeforeRejoin(master))
+        return true;
+
+    botAI->ClearCityRejoin();
+
+    // The one choke point before the teleport, so no path out of ShouldMountBeforeRejoin - the
+    // master landing mid-cast included - can leave a stale timestamp to poison the next rejoin.
+    _mountingSince = 0;
 
     bot->RemoveAurasWithInterruptFlags(AURA_INTERRUPT_FLAG_TELEPORTED | AURA_INTERRUPT_FLAG_CHANGE_MAP);
     bot->TeleportTo(master->GetMapId(), master->GetPositionX(), master->GetPositionY(),

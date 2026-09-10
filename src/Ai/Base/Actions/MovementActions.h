@@ -276,6 +276,13 @@ public:
 
     bool isUseful() override;
     bool Execute(Event event) override;
+
+private:
+    // True while the bot is still getting a mount under itself, which holds the teleport back.
+    bool ShouldMountBeforeRejoin(Player* master);
+
+    // When the current mount-up started, so it cannot stall the rejoin indefinitely.
+    time_t _mountingSince = 0;
 };
 
 class MoveInsideAction : public MovementAction
