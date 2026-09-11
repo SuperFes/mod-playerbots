@@ -522,6 +522,12 @@ AiPlayerbot.SafeDismountHeight = 8
 # Put a mount back under the bot the instant it lands next to a mounted master, matched to what the
 # master is riding. Mounting before the teleport cannot work - TeleportTo strips the mount for any
 # hop over 100 yards - so this applies on arrival, before the bot has a chance to fall.
+# How far a bot has to be before the "follow" command teleports it rather than letting it walk
+# back. Calling the party off a grind should not yank bots that are standing a few yards away.
+# A bot on another map always teleports, since there is no walking back from that.
+# Defaults to SightDistance.
+AiPlayerbot.FollowTeleportDistance = 100.0
+
 AiPlayerbot.MountOnRejoin = 1
 
 # Let a bot finish mounting before it chases a mounted master. A mount is a cast that any movement

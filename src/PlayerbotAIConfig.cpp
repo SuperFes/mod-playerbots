@@ -146,6 +146,8 @@ bool PlayerbotAIConfig::Initialize()
     buyReagents = sConfigMgr->GetOption<bool>("AiPlayerbot.BuyReagents", true);
     buyReagentsStack = std::min<uint32>(60u, sConfigMgr->GetOption<uint32>("AiPlayerbot.BuyReagentsStack", 20));
     safeDismountHeight = std::max(1.0f, sConfigMgr->GetOption<float>("AiPlayerbot.SafeDismountHeight", 8.0f));
+    followTeleportDistance =
+        sConfigMgr->GetOption<float>("AiPlayerbot.FollowTeleportDistance", sightDistance);
     mountOnRejoin = sConfigMgr->GetOption<bool>("AiPlayerbot.MountOnRejoin", true);
     mountBeforeFollowing = sConfigMgr->GetOption<bool>("AiPlayerbot.MountBeforeFollowing", true);
     mountPrioritySeconds = sConfigMgr->GetOption<uint32>("AiPlayerbot.MountPrioritySeconds", 5);

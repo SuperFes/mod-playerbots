@@ -131,8 +131,18 @@ bool FollowChatShortcutAction::Execute(Event /*event*/)
             botAI->TellMasterNoFacing("Back from the grave!");
         }
 
-        bot->RemoveAurasWithInterruptFlags(AURA_INTERRUPT_FLAG_TELEPORTED | AURA_INTERRUPT_FLAG_CHANGE_MAP);
-        bot->TeleportTo(master->GetMapId(), master->GetPositionX(), master->GetPositionY(), master->GetPositionZ(), master->GetOrientation());
+        // Teleport only when walking back is not an option. This used to fire unconditionally, so
+        // calling the party back off a grind yanked bots that were standing a few yards away - the
+        // distance test existed, but only on the in-combat path above. Switching the strategy is
+        // enough on its own; "follow" then walks them in like anyone else.
+        bool const crossMap = bot->GetMapId() != master->GetMapId();
+        if (crossMap || bot->GetDistance(master) > sPlayerbotAIConfig.followTeleportDistance)
+        {
+            bot->RemoveAurasWithInterruptFlags(AURA_INTERRUPT_FLAG_TELEPORTED | AURA_INTERRUPT_FLAG_CHANGE_MAP);
+            bot->TeleportTo(master->GetMapId(), master->GetPositionX(), master->GetPositionY(),
+                            master->GetPositionZ(), master->GetOrientation());
+        }
+
         botAI->TellMaster(PlayerbotTextMgr::instance().GetBotTextOrDefault(
             "following", "Following", GetDefaultPlaceholders(botAI, bot, master)));
         return true;

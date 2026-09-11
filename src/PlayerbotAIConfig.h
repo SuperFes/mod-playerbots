@@ -124,6 +124,7 @@ public:
     bool buyReagents;
     uint32 buyReagentsStack;
     float safeDismountHeight;
+    float followTeleportDistance;
     bool mountOnRejoin;
     bool mountBeforeFollowing;
     uint32 mountPrioritySeconds;
