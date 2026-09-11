@@ -277,7 +277,10 @@ bool TradeStatusAction::CheckTrade()
     if (!botMoney && !playerMoney)
         return true;
 
-    if (!botItemsMoney && !playerItemsMoney)
+    // Presence, not value. This used to test the two valuations, so money for items the bot happened
+    // to price at nothing - junk it is clearing out, say - read as an empty trade and was refused
+    // until the player put an item in as well. Money one way and goods the other is a normal trade.
+    if (!HasTradedItem(bot) && !HasTradedItem(trader))
     {
         botAI->TellError(PlayerbotTextMgr::instance().GetBotTextOrDefault(
             "trade_no_items_error", "There are no items to trade", {}));
@@ -328,6 +331,13 @@ bool TradeStatusAction::CheckTrade()
                 break;
         }
 
+        // It already names a price when refusing; say so when accepting too, rather than leaving the
+        // player to guess whether they over-paid.
+        if (delta > 0)
+            botAI->TellMaster(PlayerbotTextMgr::instance().GetBotTextOrDefault(
+                "trade_value_gain", "That is %money more than I asked for - thank you",
+                {{"%money", chat->formatMoney(delta)}}));
+
         botAI->PlaySound(TEXT_EMOTE_THANK);
         return true;
     }
@@ -338,6 +348,19 @@ bool TradeStatusAction::CheckTrade()
         "I want %money for this",
         {{"%money", chat->formatMoney(-(delta + discount))}}));
     botAI->PlaySound(TEXT_EMOTE_NO);
+    return false;
+}
+
+bool TradeStatusAction::HasTradedItem(Player* player)
+{
+    TradeData* data = player ? player->GetTradeData() : nullptr;
+    if (!data)
+        return false;
+
+    for (uint32 slot = 0; slot < TRADE_SLOT_TRADED_COUNT; ++slot)
+        if (data->GetItem((TradeSlots)slot))
+            return true;
+
     return false;
 }
 
@@ -359,8 +382,11 @@ int32 TradeStatusAction::CalculateCost(Player* player, bool sell)
         if (!proto)
             continue;
 
+        // Worth nothing as payment, but only this item - returning here abandoned the running total
+        // and valued the whole side at zero, so one grey in the window made a bot refuse to trade
+        // anything at all.
         if (proto->Quality < ITEM_QUALITY_NORMAL)
-            return 0;
+            continue;
 
         CraftData& craftData = AI_VALUE(CraftData&, "craft");
         if (!craftData.IsEmpty())
