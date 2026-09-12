@@ -730,6 +730,7 @@ protected:
     bool _cityRejoinPending = false;
     bool _remountOnArrival = false;
     time_t _mountPrioritySince = 0;
+    time_t _mountPriorityLogged = 0;
     bool _cityAnchorSet = false;
     float _cityAnchorX = 0.0f;
     float _cityAnchorY = 0.0f;

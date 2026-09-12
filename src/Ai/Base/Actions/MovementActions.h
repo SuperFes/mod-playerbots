@@ -44,6 +44,9 @@ protected:
     float GetFollowAngle();
     bool Follow(Unit* target, float distance = sPlayerbotAIConfig.followDistance);
     bool Follow(Unit* target, float distance, float angle);
+
+    // A mount is going up right now. Movement cancels the cast, so follow has to leave it alone.
+    bool IsCastingMount() const;
     bool ChaseTo(WorldObject* obj, float distance = 0.0f);
     bool ReachCombatTo(Unit* target, float distance = 0.0f);
     float MoveDelay(float distance, bool backwards = false);

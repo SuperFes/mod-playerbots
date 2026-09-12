@@ -1107,6 +1107,23 @@ void MovementAction::UpdateMovementState()
     // }
 }
 
+bool MovementAction::IsCastingMount() const
+{
+    for (uint8 type = CURRENT_MELEE_SPELL; type <= CURRENT_CHANNELED_SPELL; ++type)
+    {
+        Spell* spell = bot->GetCurrentSpell((CurrentSpellTypes)type);
+        if (!spell)
+            continue;
+
+        SpellInfo const* info = spell->GetSpellInfo();
+        if (info && (info->HasAura(SPELL_AURA_MOUNTED) ||
+                     info->HasAura(SPELL_AURA_MOD_INCREASE_MOUNTED_FLIGHT_SPEED)))
+            return true;
+    }
+
+    return false;
+}
+
 bool MovementAction::Follow(Unit* target, float distance, float angle)
 {
     UpdateMovementState();
@@ -1194,6 +1211,10 @@ bool MovementAction::Follow(Unit* target, float distance, float angle)
     if (ServerFacade::instance().IsDistanceGreaterOrEqualThan(ServerFacade::instance().GetDistance2d(bot, target),
                                                     sPlayerbotAIConfig.sightDistance))
     {
+        LOG_DEBUG("playerbots", "Bot {} following {} from {} yds (target flying {}, bot mounted {})",
+                  bot->GetName(), target->GetName(), bot->GetExactDist2d(target),
+                  target->IsFlying() ? "yes" : "no", bot->IsMounted() ? "yes" : "no");
+
         if (target->GetGUID().IsPlayer())
         {
             Player* pTarget = (Player*)target;
@@ -1260,7 +1281,11 @@ bool MovementAction::Follow(Unit* target, float distance, float angle)
     if (bot->IsSitState())
         bot->SetStandState(UNIT_STAND_STATE_STAND);
 
-    if (bot->IsNonMeleeSpellCast(true))
+    // Never cancel a mount going up. Chasing a mounted master on foot is hopeless anyway, and
+    // killing the cast here is self-defeating: the bot restarts it, follow kills it again, and it
+    // never gets a mount at all - which left bots rooted in place when the master took off quickly,
+    // recovering only once he landed and follow went quiet enough for a cast to survive.
+    if (bot->IsNonMeleeSpellCast(true) && !IsCastingMount())
     {
         bot->CastStop();
         botAI->InterruptSpell();

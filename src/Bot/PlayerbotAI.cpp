@@ -997,6 +997,17 @@ bool PlayerbotAI::ShouldMountBeforeFollowing()
         return false;
     }
 
+    // Diagnostic: this window is meant to last a second or two. If a stalled bot is logging this for
+    // a whole flight, the suppression is the stall; if it stops after MountPrioritySeconds and the
+    // bot is still rooted, the stall is downstream in Follow/MoveTo and this is a red herring.
+    if (now != _mountPriorityLogged)
+    {
+        _mountPriorityLogged = now;
+        LOG_DEBUG("playerbots", "Bot {} holding follow to mount ({}s, master {} yds away, flying {})",
+                  bot->GetName(), now - _mountPrioritySince, bot->GetExactDist2d(currentMaster),
+                  currentMaster->IsFlying() ? "yes" : "no");
+    }
+
     return true;
 }
 
