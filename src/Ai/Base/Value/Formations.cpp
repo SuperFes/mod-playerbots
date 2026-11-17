@@ -5,7 +5,6 @@
  */
 
 #include "Formations.h"
-
 #include "Arrow.h"
 #include "Event.h"
 #include "Map.h"
@@ -76,8 +75,8 @@ WorldLocation MoveAheadFormation::GetLocation()
     // if (master->isMoving())
     // {
     //     float ori = master->GetOrientation();
-    //     float x1 = x + sPlayerbotAIConfig.tooCloseDistance * cos(ori);
-    //     float y1 = y + sPlayerbotAIConfig.tooCloseDistance * sin(ori);
+    //     float x1 = x + sPlayerbotAIConfig.TooCloseDistance * cos(ori);
+    //     float y1 = y + sPlayerbotAIConfig.TooCloseDistance * sin(ori);
     //     float ground = map->GetHeight(x1, y1, z);
     //     if (ground > INVALID_HEIGHT)
     //     {
@@ -119,7 +118,7 @@ void GetPersonalSpaceOffset(PlayerbotAI* botAI, Player* master, float driftX, fl
                             float& outX, float& outY)
 {
     BotPersonality const& personality = botAI->GetPersonality();
-    float const spread = sPlayerbotAIConfig.followDistance * FORMATION_SPREAD_FRACTION;
+    float const spread = sPlayerbotAIConfig.FollowDistance * FORMATION_SPREAD_FRACTION;
 
     float const localX = personality.personalSpaceX * spread + driftX;
     float const localY = personality.personalSpaceY * spread + driftY;
@@ -141,7 +140,7 @@ public:
         if (!ValidateTargetContext(master, bot, map))
             return Formation::NullLocation;
 
-        float range = sPlayerbotAIConfig.followDistance;
+        float range = sPlayerbotAIConfig.FollowDistance;
         float angle = GetFollowAngle();
 
         float offsetX = 0.0f;
@@ -159,7 +158,7 @@ public:
     // Must cover the offset, or the bot would be judged out of position at its own standing spot.
     float GetMaxDistance() override
     {
-        return sPlayerbotAIConfig.followDistance * (1.0f + FORMATION_SPREAD_FRACTION);
+        return sPlayerbotAIConfig.FollowDistance * (1.0f + FORMATION_SPREAD_FRACTION);
     }
 };
 
@@ -175,7 +174,7 @@ public:
         if (!ValidateTargetContext(master, bot, map))
             return Formation::NullLocation;
 
-        float range = sPlayerbotAIConfig.followDistance;
+        float range = sPlayerbotAIConfig.FollowDistance;
         float angle = GetFollowAngle();
 
         // Previously this re-rolled a +/- tooCloseDistance/2 offset every 3 seconds for every bot, which
@@ -190,7 +189,7 @@ public:
             driftPeriod = urand(FORMATION_DRIFT_PERIOD_MIN, FORMATION_DRIFT_PERIOD_MAX);
 
             float const driftLimit =
-                sPlayerbotAIConfig.followDistance * FORMATION_SPREAD_FRACTION * FORMATION_DRIFT_FRACTION;
+                sPlayerbotAIConfig.FollowDistance * FORMATION_SPREAD_FRACTION * FORMATION_DRIFT_FRACTION;
 
             driftX = frand(-driftLimit, driftLimit);
             driftY = frand(-driftLimit, driftLimit);
@@ -207,7 +206,7 @@ public:
         return WorldLocation(master->GetMapId(), x, y, z);
     }
 
-    float GetMaxDistance() override { return sPlayerbotAIConfig.followDistance + dr; }
+    float GetMaxDistance() override { return sPlayerbotAIConfig.FollowDistance + dr; }
 
 private:
     time_t lastChangeTime;
@@ -247,11 +246,11 @@ public:
                 range = botAI->GetRange("flee");
                 break;
             case CLASS_DRUID:
-                if (!botAI->IsTank(bot))
+                if (!PlayerbotAI::IsTank(bot))
                     range = botAI->GetRange("flee");
                 break;
             case CLASS_SHAMAN:
-                if (botAI->IsHeal(bot))
+                if (PlayerbotAI::IsHeal(bot))
                     range = botAI->GetRange("flee");
                 break;
         }
@@ -324,7 +323,7 @@ public:
         if (!group)
             return Formation::NullLocation;
 
-        float range = sPlayerbotAIConfig.followDistance;
+        float range = sPlayerbotAIConfig.FollowDistance;
 
         Player* master = GetMaster();
         if (!master)
@@ -344,33 +343,33 @@ public:
             if (!member || member == master)
                 continue;
 
-            if (botAI->IsTank(member))
+            if (PlayerbotAI::IsTank(member))
                 tanks.push_back(member);
             else
                 dps.push_back(member);
         }
 
-        if (botAI->IsTank(master))
+        if (PlayerbotAI::IsTank(master))
             tanks.insert(tanks.begin() + (tanks.size() + 1) / 2, master);
         else
             dps.insert(dps.begin() + (dps.size() + 1) / 2, master);
 
-        if (botAI->IsTank(bot) && botAI->IsTank(master))
+        if (PlayerbotAI::IsTank(bot) && PlayerbotAI::IsTank(master))
             return MoveLine(tanks, 0.0f, x, y, z, orientation, range);
 
-        if (!botAI->IsTank(bot) && !botAI->IsTank(master))
+        if (!PlayerbotAI::IsTank(bot) && !PlayerbotAI::IsTank(master))
             return MoveLine(dps, 0.0f, x, y, z, orientation, range);
 
-        if (botAI->IsTank(bot) && !botAI->IsTank(master))
+        if (PlayerbotAI::IsTank(bot) && !PlayerbotAI::IsTank(master))
         {
-            float diff = (tanks.size() % 2 == 0) ? -sPlayerbotAIConfig.tooCloseDistance / 2.0f : 0.0f;
+            float diff = (tanks.size() % 2 == 0) ? -sPlayerbotAIConfig.TooCloseDistance / 2.0f : 0.0f;
             return MoveLine(tanks, diff, x + cos(orientation) * range, y + sin(orientation) * range, z, orientation,
                             range);
         }
 
-        if (!botAI->IsTank(bot) && botAI->IsTank(master))
+        if (!PlayerbotAI::IsTank(bot) && PlayerbotAI::IsTank(master))
         {
-            float diff = (dps.size() % 2 == 0) ? -sPlayerbotAIConfig.tooCloseDistance / 2.0f : 0.0f;
+            float diff = (dps.size() % 2 == 0) ? -sPlayerbotAIConfig.TooCloseDistance / 2.0f : 0.0f;
             return MoveLine(dps, diff, x - cos(orientation) * range, y - sin(orientation) * range, z, orientation,
                             range);
         }
@@ -391,8 +390,8 @@ public:
         if (!ValidateTargetContext(master, bot, map))
             return Formation::NullLocation;
 
-        float range = sPlayerbotAIConfig.farDistance;
-        float followRange = sPlayerbotAIConfig.followDistance;
+        float range = sPlayerbotAIConfig.FarDistance;
+        float followRange = sPlayerbotAIConfig.FollowDistance;
 
         if (ServerFacade::instance().GetDistance2d(bot, master) <= range)
             return Formation::NullLocation;
@@ -478,7 +477,6 @@ float Formation::GetFollowAngle()
 {
     Player* master = GetMaster();
     Group* group = bot->GetGroup();
-    PlayerbotAI* botAI = GET_PLAYERBOT_AI(bot);
 
     // If there's no master and no group
     if (!master && !group)
@@ -515,19 +513,19 @@ float Formation::GetFollowAngle()
                 continue;
 
             // Put DPS in the middle
-            if (!botAI->IsTank(member) && !botAI->IsHeal(member))
+            if (!PlayerbotAI::IsTank(member) && !PlayerbotAI::IsHeal(member))
             {
                 roster.insert(roster.begin() + roster.size() / 2, member);
             }
 
             // Put Healers in the middle
-            else if (botAI->IsHeal(member))
+            else if (PlayerbotAI::IsHeal(member))
             {
                 roster.insert(roster.begin() + roster.size() / 2, member);
             }
 
             // Handle tanks (alternate between front and back)
-            else if (botAI->IsTank(member))
+            else if (PlayerbotAI::IsTank(member))
             {
                 if (left)
                     roster.push_back(member);  // Place tank at the back

@@ -5,12 +5,12 @@
  */
 
 #include "LfgActions.h"
-
 #include "AiFactory.h"
 #include "ItemVisitors.h"
 #include "LFGMgr.h"
 #include "Opcodes.h"
 #include "Playerbots.h"
+#include "RandomPlayerbotMgr.h"
 #include "World.h"
 #include "WorldPacket.h"
 #include "PlayerbotTextMgr.h"
@@ -18,15 +18,38 @@
 
 using namespace lfg;
 
+namespace
+{
+    constexpr uint8 CLASSIC_MAX_LEVEL = 60;
+    constexpr uint8 TBC_MAX_LEVEL = 70;
+
+    bool IsExpansionOutleveled(LFGDungeonEntry const* dungeon, uint8 level)
+    {
+        // Seasonal bosses keep their original expansion but are level 78-82.
+        if (dungeon->Flags & LFG_FLAG_SEASONAL)
+            return false;
+
+        switch (dungeon->ExpansionLevel)
+        {
+            case EXPANSION_CLASSIC:
+                return level > CLASSIC_MAX_LEVEL;
+            case EXPANSION_THE_BURNING_CRUSADE:
+                return level > TBC_MAX_LEVEL;
+            default:
+                return false;
+        }
+    }
+}
+
 bool LfgJoinAction::Execute(Event /*event*/) { return JoinLFG(); }
 
 uint32 LfgJoinAction::GetRoles()
 {
     if (!RandomPlayerbotMgr::instance().IsRandomBot(bot))
     {
-        if (botAI->IsTank(bot))
+        if (PlayerbotAI::IsTank(bot))
             return PLAYER_ROLE_TANK;
-        if (botAI->IsHeal(bot))
+        if (PlayerbotAI::IsHeal(bot))
             return PLAYER_ROLE_HEALER;
         else
             return PLAYER_ROLE_DAMAGE;
@@ -121,6 +144,10 @@ bool LfgJoinAction::JoinLFG()
             (botLevel > dungeon->MinLevel + 10 && dungeon->TypeID == LFG_TYPE_DUNGEON))
             continue;
 
+        // LFG level ranges run past the expansion cap: Stratholme is 55-65.
+        if (!sPlayerbotAIConfig.RandomBotJoinLfgOutleveledExpansion && IsExpansionOutleveled(dungeon, botLevel))
+            continue;
+
         selected.push_back(dungeon->ID);
         list.insert(dungeon->ID);
     }
@@ -174,7 +201,7 @@ bool LfgJoinAction::JoinLFG()
 
 bool LfgRoleCheckAction::Execute(Event /*event*/)
 {
-    if (Group* group = bot->GetGroup())
+    if (bot->GetGroup())
     {
         uint32 newRoles = GetRoles();
         // if (currentRoles == newRoles)
@@ -202,7 +229,7 @@ bool LfgAcceptAction::WouldAbandonMaster() const
     if (!group || group->isLFGGroup())
         return false;
 
-    if (!botAI->HasRealPlayerMaster() || !group->IsMember(botAI->GetMaster()->GetGUID()))
+    if (!botAI->HasGameClientMaster() || !group->IsMember(botAI->GetMaster()->GetGUID()))
         return false;
 
     // If the party queued together the proposal is for all of us, and accepting is what keeps us
@@ -266,6 +293,15 @@ bool LfgLeaveAction::Execute(Event /*event*/)
 
     // Don't leave if already invited / in dungeon
     if (sLFGMgr->GetState(bot->GetGUID()) > LFG_STATE_QUEUED)
+        return false;
+
+    // Don't drop a queue we deliberately joined. The "seldom" tick (RandomTrigger, ~300s)
+    // otherwise pulls random bots straight back out, so LFGQueue::CheckCompatibility never
+    // sees a role-complete pool that holds still long enough to form a group. Turning
+    // RandomBotJoinLfg off still lets whoever is mid-queue fall through and leave.
+    // Config bool is tested first so the O(currentBots) IsRandomBot() scan is skipped
+    // whenever the feature is disabled.
+    if (sPlayerbotAIConfig.RandomBotJoinLfg && RandomPlayerbotMgr::instance().IsRandomBot(bot))
         return false;
 
     WorldPacket* packet = new WorldPacket(CMSG_LFG_LEAVE);
@@ -367,7 +403,7 @@ bool LfgTeleportDeniedAction::Execute(Event event)
 
 bool LfgJoinAction::isUseful()
 {
-    if (!sPlayerbotAIConfig.randomBotJoinLfg)
+    if (!sPlayerbotAIConfig.RandomBotJoinLfg)
     {
         // botAI->ChangeStrategy("-lfg", BOT_STATE_NON_COMBAT);
         return false;
@@ -376,9 +412,9 @@ bool LfgJoinAction::isUseful()
     if (bot->GetLevel() < 15)
         return false;
 
-    // IsRealPlayer() only means "master is itself", so this used to let a bot serving a human queue
-    // for a dungeon behind their back, get a proposal, accept it and vanish into an instance.
-    if (botAI->HasRealPlayerMaster())
+    // Covers SelfBots and bots serving a human: neither should queue, accept a proposal and vanish
+    // into an instance behind the player's back.
+    if (botAI->HasGameClientMaster())
         return false;
 
     if (bot->GetGroup() && bot->GetGroup()->GetLeaderGUID() != bot->GetGUID())

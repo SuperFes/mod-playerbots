@@ -5,7 +5,6 @@
  */
 
 #include "PositionAction.h"
-
 #include "Event.h"
 #include "Playerbots.h"
 #include "PositionValue.h"
@@ -121,7 +120,7 @@ bool MoveToPositionAction::isUseful()
 {
     PositionInfo pos = context->GetValue<PositionMap&>("position")->Get()[qualifier];
     float distance = AI_VALUE2(float, "distance", std::string("position_") + qualifier);
-    return pos.isSet() && distance > sPlayerbotAIConfig.followDistance && distance < sPlayerbotAIConfig.reactDistance;
+    return pos.isSet() && distance > sPlayerbotAIConfig.FollowDistance && distance < sPlayerbotAIConfig.ReactDistance;
 }
 
 bool SetReturnPositionAction::Execute(Event /*event*/)
@@ -132,7 +131,7 @@ bool SetReturnPositionAction::Execute(Event /*event*/)
     if (returnPos.isSet() && !randomPos.isSet())
     {
         float angle = 2 * M_PI * urand(0, 1000) / 100.0f;
-        float dist = sPlayerbotAIConfig.followDistance * urand(0, 1000) / 1000.0f;
+        float dist = sPlayerbotAIConfig.FollowDistance * urand(0, 1000) / 1000.0f;
         float x = returnPos.x + cos(angle) * dist;
         float y = returnPos.y + sin(angle) * dist;
         float z = bot->GetPositionZ();
@@ -158,7 +157,7 @@ bool SetReturnPositionAction::isUseful()
 bool ReturnAction::isUseful()
 {
     PositionInfo pos = context->GetValue<PositionMap&>("position")->Get()[qualifier];
-    return pos.isSet() && AI_VALUE2(float, "distance", "position_random") > sPlayerbotAIConfig.followDistance;
+    return pos.isSet() && AI_VALUE2(float, "distance", "position_random") > sPlayerbotAIConfig.FollowDistance;
 }
 
 bool ReturnToStayPositionAction::isUseful()
@@ -191,7 +190,7 @@ bool ReturnToStayPositionAction::Execute(Event event)
     // comparing positions from two different coordinate spaces.
     bool const otherMap = stayPosition.mapId != bot->GetMapId();
     bool const tooFar = otherMap ||
-        bot->GetDistance(stayPosition.x, stayPosition.y, stayPosition.z) > sPlayerbotAIConfig.reactDistance;
+        bot->GetDistance(stayPosition.x, stayPosition.y, stayPosition.z) > sPlayerbotAIConfig.ReactDistance;
 
     if (!tooFar)
         return MoveToPositionAction::Execute(event);

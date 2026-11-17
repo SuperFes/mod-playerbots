@@ -9,6 +9,7 @@
 #include "GenericBuffUtils.h"
 
 #include "BudgetValues.h"
+#include "DBCStores.h"
 #include "Event.h"
 #include "ItemCountValue.h"
 #include "ItemUsageValue.h"
@@ -69,25 +70,24 @@ bool BuyAction::Execute(Event event)
             calculator.SetItemSetBonus(false);
             calculator.SetOverflowPenalty(false);
 
+            // Score each item once; the comparator must be a strict weak ordering, and the old
+            // "if either score is 0, compare item level" branch was not.
+            std::unordered_map<uint32, std::pair<float, uint32>> itemScores;
+            for (VendorItem const* vendorItem : m_items_sorted)
+            {
+                ItemTemplate const* proto = sObjectMgr->GetItemTemplate(vendorItem->item);
+                itemScores[vendorItem->item] = {calculator.CalculateItem(vendorItem->item),
+                                                proto ? proto->ItemLevel : 0};
+            }
+
             std::sort(m_items_sorted.begin(), m_items_sorted.end(),
-                [&calculator](VendorItem* i, VendorItem* j)
+                [&itemScores](VendorItem* i, VendorItem* j)
                 {
-                    ItemTemplate const* item1 = sObjectMgr->GetItemTemplate(i->item);
-                    ItemTemplate const* item2 = sObjectMgr->GetItemTemplate(j->item);
-
-                    if (!item1 || !item2)
-                        return false;
-
-                    float score1 = calculator.CalculateItem(item1->ItemId);
-                    float score2 = calculator.CalculateItem(item2->ItemId);
-
-                    // Fallback to itemlevel if either score is 0
-                    if (score1 == 0 || score2 == 0)
-                    {
-                        score1 = item1->ItemLevel;
-                        score2 = item2->ItemLevel;
-                    }
-                    return score1 > score2; // Sort in descending order (highest score first)
+                    auto const& score1 = itemScores.at(i->item);
+                    auto const& score2 = itemScores.at(j->item);
+                    if (score1.first != score2.first)
+                        return score1.first > score2.first;
+                    return score1.second > score2.second;
                 });
 
             std::unordered_map<uint32, float> bestPurchasedItemScore;  // Track best item score per InventoryType
@@ -106,12 +106,16 @@ bool BuyAction::Execute(Event event)
 
                 for (uint32 i = 0; i < maxPurchases; i++)
                 {
+                    // Stock and currency costs change between purchases; recheck each time.
+                    if (!CanAfford(tItem, proto, pCreature))
+                        break;
+
                     ItemUsage usage = AI_VALUE2(ItemUsage, "item usage", tItem->item);
 
                     uint32 invType = proto->InventoryType;
 
-                    // Calculate item score
-                    float newScore = calculator.CalculateItem(proto->ItemId);
+                    // Reuse the score computed for the sort.
+                    float newScore = itemScores.at(proto->ItemId).first;
 
                     // Skip if we already bought a better item for this slot
                     if (bestPurchasedItemScore.find(invType) != bestPurchasedItemScore.end() &&
@@ -219,6 +223,35 @@ bool BuyAction::Execute(Event event)
     return vendored;
 }
 
+bool BuyAction::CanAfford(VendorItem const* tItem, ItemTemplate const* proto, Creature* vendor) const
+{
+    // Limited stock: skip if the vendor has fewer than one purchase remaining.
+    if (tItem->maxcount != 0 && vendor->GetVendorItemCurrentCount(tItem) < proto->BuyCount)
+        return false;
+
+    // Non-gold costs (honor / arena points, token items, personal arena rating).
+    if (tItem->ExtendedCost)
+    {
+        ItemExtendedCostEntry const* iece = sItemExtendedCostStore.LookupEntry(tItem->ExtendedCost);
+        if (!iece)
+            return false;
+
+        if (bot->GetHonorPoints() < iece->reqhonorpoints)
+            return false;
+        if (bot->GetArenaPoints() < iece->reqarenapoints)
+            return false;
+
+        for (uint8 i = 0; i < MAX_ITEM_EXTENDED_COST_REQUIREMENTS; ++i)
+            if (iece->reqitem[i] && !bot->HasItemCount(iece->reqitem[i], iece->reqitemcount[i]))
+                return false;
+
+        if (bot->GetMaxPersonalArenaRatingRequirement(iece->reqarenaslot) < iece->reqpersonalarenarating)
+            return false;
+    }
+
+    return true;
+}
+
 bool BuyAction::BuyItem(VendorItemData const* tItems, ObjectGuid vendorguid, ItemTemplate const* proto)
 {
     if (!tItems || !proto)
@@ -285,14 +318,14 @@ std::set<uint32> BuyReagentsAction::FindMissingReagents() const
 
 bool BuyReagentsAction::isUseful()
 {
-    if (!sPlayerbotAIConfig.buyReagents)
+    if (!sPlayerbotAIConfig.BuyReagents)
         return false;
 
     if (bot->IsInCombat() || botAI->GetState() == BOT_STATE_COMBAT || bot->isMoving())
         return false;
 
     // Same gate as the other vendor work: only once the group has actually stopped.
-    if (botAI->GetIdleSeconds() < sPlayerbotAIConfig.tradeskillIdleSeconds)
+    if (botAI->GetIdleSeconds() < sPlayerbotAIConfig.TradeskillIdleSeconds)
         return false;
 
     GuidVector const npcs = botAI->GetAiObjectContext()->GetValue<GuidVector>("nearest npcs")->Get();
@@ -330,7 +363,7 @@ bool BuyReagentsAction::Execute(Event /*event*/)
 
             // BuyItem is a no-op when this vendor does not stock it, so trying every nearby vendor
             // is how a bot finds the one that sells what it needs.
-            for (uint32 n = 0; n < sPlayerbotAIConfig.buyReagentsStack; ++n)
+            for (uint32 n = 0; n < sPlayerbotAIConfig.BuyReagentsStack; ++n)
                 if (!BuyItem(items, guid, proto))
                     break;
                 else
@@ -352,7 +385,7 @@ bool BuyReagentsAction::Execute(Event /*event*/)
             if (AI_VALUE2(ItemUsage, "item usage", std::to_string(proto->ItemId)) != ITEM_USAGE_AMMO)
                 continue;
 
-            for (uint32 n = 0; n < sPlayerbotAIConfig.buyReagentsStack; ++n)
+            for (uint32 n = 0; n < sPlayerbotAIConfig.BuyReagentsStack; ++n)
                 if (!BuyItem(items, guid, proto))
                     break;
                 else

@@ -76,13 +76,13 @@ std::vector<Item*> AuctionSurplusAction::FindAuctionable() const
 
 bool AuctionSurplusAction::isUseful()
 {
-    if (!sPlayerbotAIConfig.auctionSurplus)
+    if (!sPlayerbotAIConfig.AuctionSurplus)
         return false;
 
     if (bot->IsInCombat() || botAI->GetState() == BOT_STATE_COMBAT || bot->isMoving())
         return false;
 
-    if (botAI->GetIdleSeconds() < sPlayerbotAIConfig.tradeskillIdleSeconds)
+    if (botAI->GetIdleSeconds() < sPlayerbotAIConfig.TradeskillIdleSeconds)
         return false;
 
     return FindAuctioneer() && !FindAuctionable().empty();
@@ -99,7 +99,7 @@ bool AuctionSurplusAction::ListItem(ObjectGuid auctioneer, Item* item)
     // No market history to price against, so anchor on vendor value and ask for a multiple of it -
     // roughly what a player does when they cannot be bothered to check the auction house.
     uint32 const base = proto->SellPrice * count;
-    uint32 const bid = std::max<uint32>(1, base * sPlayerbotAIConfig.auctionPriceMultiplier);
+    uint32 const bid = std::max<uint32>(1, base * sPlayerbotAIConfig.AuctionPriceMultiplier);
     uint32 const buyout = bid + bid / 4;
 
     WorldPacket packet(CMSG_AUCTION_SELL_ITEM);
@@ -130,7 +130,7 @@ bool AuctionSurplusAction::Execute(Event /*event*/)
     uint32 listed = 0;
     for (Item* item : items)
     {
-        if (listed >= sPlayerbotAIConfig.auctionMaxPerVisit)
+        if (listed >= sPlayerbotAIConfig.AuctionMaxPerVisit)
             break;
 
         if (ListItem(auctioneer, item))

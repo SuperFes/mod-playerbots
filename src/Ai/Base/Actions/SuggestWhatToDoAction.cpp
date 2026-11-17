@@ -4,22 +4,23 @@
  * or (at your option) any later version.
  */
 
-#include <functional>
-
 #include "SuggestWhatToDoAction.h"
-#include "ServerFacade.h"
+#include "AiFactory.h"
+#include "AmbitionMgr.h"
+#include "BroadcastHelper.h"
+#include "Channel.h"
+#include "ChatHelper.h"
+#include "DBCStores.h"
 #include "Event.h"
 #include "ItemVisitors.h"
-#include "AiFactory.h"
-#include "ChatHelper.h"
 #include "Playerbots.h"
-#include "AmbitionMgr.h"
-#include "DBCStores.h"
+#include "ServerFacade.h"
 #include "SpellMgr.h"
 #include "Weather.h"
+#include <functional>
 
 // Was urand(300, 600) plus up to 300s of jitter - 5 to 15 minutes per bot, which read as silence.
-// PlayerbotAI::SocialCooldown scales these by the bot's chattiness and AiPlayerbot.SocialCooldownScale.
+// PlayerbotAI::SocialCooldown scales these by the bot's chattiness and Playerbots.SocialCooldownScale.
 // An ambition is a long arc; mentioning it every few minutes would spoil it.
 // Long enough that a callout is information, not chatter.
 // Local chatter is heard by anyone standing nearby, so it wants to be rare.
@@ -34,14 +35,6 @@ static constexpr uint32 AMBITION_COOLDOWN_MAX = 2400;
 
 static constexpr uint32 SUGGEST_COOLDOWN_MIN = 90;
 static constexpr uint32 SUGGEST_COOLDOWN_MAX = 240;
-#include "BroadcastHelper.h"
-#include "AiFactory.h"
-#include "ChatHelper.h"
-#include "Event.h"
-#include "ItemVisitors.h"
-#include "Playerbots.h"
-#include "ServerFacade.h"
-#include "Channel.h"
 
 enum eTalkType
 {
@@ -282,7 +275,7 @@ bool SuggestDungeonAction::Execute(Event /*event*/)
     botAI->GetAiObjectContext()->GetValue<time_t>("last said", qualifier)
         ->Set(time(nullptr) + botAI->SocialCooldown(SUGGEST_COOLDOWN_MIN, SUGGEST_COOLDOWN_MAX));
 
-    if (!sPlayerbotAIConfig.randomBotSuggestDungeons || bot->GetGroup())
+    if (!sPlayerbotAIConfig.RandomBotSuggestDungeons || bot->GetGroup())
         return false;
 
     if (instances.empty())
@@ -407,7 +400,7 @@ bool SuggestTradeAction::Execute(Event /*event*/)
 
 bool MentionAmbitionAction::isUseful()
 {
-    if (!sPlayerbotAIConfig.botAmbitions)
+    if (!sPlayerbotAIConfig.BotAmbitions)
         return false;
 
     if (botAI->GetPersonality().ambition == BotAmbitionKind::None)
@@ -531,11 +524,11 @@ UtilityCalloutAction::Cooldown const* UtilityCalloutAction::FindReadyCooldown() 
 
 bool UtilityCalloutAction::isUseful()
 {
-    if (!sPlayerbotAIConfig.utilityCallouts)
+    if (!sPlayerbotAIConfig.UtilityCallouts)
         return false;
 
     // Only worth saying to someone who can act on it.
-    if (!botAI->HasRealPlayerMaster() || !bot->GetGroup())
+    if (!botAI->HasGameClientMaster() || !bot->GetGroup())
         return false;
 
     if (time(nullptr) < AI_VALUE2(time_t, "last said", getName()))
@@ -571,10 +564,10 @@ bool UtilityCalloutAction::Execute(Event /*event*/)
 // on chatter - but only for that one kind.
 bool BattleRezCalloutAction::isUseful()
 {
-    if (!sPlayerbotAIConfig.utilityCallouts)
+    if (!sPlayerbotAIConfig.UtilityCallouts)
         return false;
 
-    if (!botAI->HasRealPlayerMaster() || !bot->GetGroup())
+    if (!botAI->HasGameClientMaster() || !bot->GetGroup())
         return false;
 
     Cooldown const* ready = FindReadyCooldown();
@@ -625,7 +618,7 @@ namespace
 
 bool AmbientSayAction::isUseful()
 {
-    if (!sPlayerbotAIConfig.ambientSay)
+    if (!sPlayerbotAIConfig.AmbientSay)
         return false;
 
     if (bot->IsInCombat() || botAI->GetState() == BOT_STATE_COMBAT)

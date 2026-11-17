@@ -5,7 +5,6 @@
  */
 
 #include "GreetAction.h"
-
 #include "Event.h"
 #include "Playerbots.h"
 
@@ -21,12 +20,12 @@ bool GreetAction::Execute(Event /*event*/)
     if (!player)
         return false;
 
-    if (!bot->HasInArc(CAST_ANGLE_IN_FRONT, player, sPlayerbotAIConfig.sightDistance))
+    if (!bot->HasInArc(CAST_ANGLE_IN_FRONT, player, sPlayerbotAIConfig.SightDistance))
         bot->SetFacingToObject(player);
 
     ObjectGuid oldSel = bot->GetTarget();
     bot->SetTarget(guid);
-    if (player->IsMounted() && sPlayerbotAIConfig.randomBotEmote && botAI->RollSocial(1))
+    if (player->IsMounted() && sPlayerbotAIConfig.RandomBotEmote && botAI->RollSocial(1))
         bot->HandleEmoteCommand(EMOTE_ONESHOT_APPLAUD);
     else
         botAI->PlayEmote(TEXT_EMOTE_HELLO);

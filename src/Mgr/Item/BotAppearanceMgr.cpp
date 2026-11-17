@@ -176,7 +176,7 @@ void BotAppearanceMgr::ApplyTo(Player* bot)
 #ifndef MOD_TRANSMOG
     (void)bot;
 #else
-    if (!bot || !sPlayerbotAIConfig.botTransmog || _usableColours.empty())
+    if (!bot || !sPlayerbotAIConfig.BotTransmog || _usableColours.empty())
         return;
 
     PlayerbotAI* botAI = GET_PLAYERBOT_AI(bot);

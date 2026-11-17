@@ -4,16 +4,14 @@
  * or (at your option) any later version.
  */
 
-#include "AiFactory.h"
 #include "SayAction.h"
-
-#include <regex>
-#include <string>
-
+#include "AiFactory.h"
 #include "Event.h"
 #include "PlayerbotTextMgr.h"
 #include "Playerbots.h"
 #include "RandomPlayerbotMgr.h"
+#include <regex>
+#include <string>
 
 static const std::unordered_set<std::string> noReplyMsgs = {
     "join",
@@ -172,7 +170,7 @@ void ChatReplyAction::ChatReplyDo(Player* bot, uint32& type, uint32& guid1, std:
 
     // second one is for partial matches like + or - where we change strats
     if (std::any_of(noReplyMsgParts.begin(), noReplyMsgParts.end(),
-                    [&msg](const std::string& part) { return msg.find(part) != std::string::npos; }))
+                    [&msg](std::string const& part) { return msg.find(part) != std::string::npos; }))
     {
         /*std::ostringstream out;
         out << "DEBUG ChatReplyDo decided to ignore partial blocklist match" << msg;
@@ -181,7 +179,7 @@ void ChatReplyAction::ChatReplyDo(Player* bot, uint32& type, uint32& guid1, std:
     }
 
     if (std::any_of(noReplyMsgStarts.begin(), noReplyMsgStarts.end(),
-                    [&msg](const std::string& start)
+                    [&msg](std::string const& start)
                     {
                         return msg.find(start) == 0;  // Check if the start matches the beginning of msg
                     }))
@@ -204,7 +202,7 @@ void ChatReplyAction::ChatReplyDo(Player* bot, uint32& type, uint32& guid1, std:
     }
 
     //toxic links
-    if (msg.starts_with(sPlayerbotAIConfig.toxicLinksPrefix)
+    if (msg.starts_with(sPlayerbotAIConfig.ToxicLinksPrefix)
         && (GET_PLAYERBOT_AI(bot)->GetChatHelper()->ExtractAllItemIds(msg).size() > 0 || GET_PLAYERBOT_AI(bot)->GetChatHelper()->ExtractAllQuestIds(msg).size() > 0))
     {
         HandleToxicLinksReply(bot, chatChannelSource);
@@ -270,7 +268,7 @@ bool ChatReplyAction::HandleToxicLinksReply(Player* bot, ChatChannelSource chatC
 
     std::map<std::string, std::string> placeholders;
     placeholders["%random_inventory_item_link"] = botItems.size() > 0 ? GET_PLAYERBOT_AI(bot)->GetChatHelper()->FormatItem(botItems[rand() % botItems.size()]->GetTemplate()) : PlayerbotTextMgr::instance().GetBotText("string_empty_link");
-    placeholders["%prefix"] = sPlayerbotAIConfig.toxicLinksPrefix;
+    placeholders["%prefix"] = sPlayerbotAIConfig.ToxicLinksPrefix;
 
     if (incompleteQuests.size() > 0)
     {
@@ -285,8 +283,8 @@ bool ChatReplyAction::HandleToxicLinksReply(Player* bot, ChatChannelSource chatC
     placeholders["%my_role"] = ChatHelper::FormatClass(bot, AiFactory::GetPlayerSpecTab(bot));
     AreaTableEntry const* current_area = GET_PLAYERBOT_AI(bot)->GetCurrentArea();
     AreaTableEntry const* current_zone = GET_PLAYERBOT_AI(bot)->GetCurrentZone();
-    placeholders["%area_name"] = current_area ? GET_PLAYERBOT_AI(bot)->GetLocalizedAreaName(current_area) : PlayerbotTextMgr::instance().GetBotText("string_unknown_area");
-    placeholders["%zone_name"] = current_zone ? GET_PLAYERBOT_AI(bot)->GetLocalizedAreaName(current_zone) : PlayerbotTextMgr::instance().GetBotText("string_unknown_area");
+    placeholders["%area_name"] = current_area ? PlayerbotAI::GetLocalizedAreaName(current_area) : PlayerbotTextMgr::instance().GetBotText("string_unknown_area");
+    placeholders["%zone_name"] = current_zone ? PlayerbotAI::GetLocalizedAreaName(current_zone) : PlayerbotTextMgr::instance().GetBotText("string_unknown_area");
     placeholders["%my_class"] = GET_PLAYERBOT_AI(bot)->GetChatHelper()->FormatClass(bot->getClass());
     placeholders["%my_race"] = GET_PLAYERBOT_AI(bot)->GetChatHelper()->FormatRace(bot->getRace());
     placeholders["%my_level"] = std::to_string(bot->GetLevel());
@@ -341,8 +339,8 @@ bool ChatReplyAction::HandleWTBItemsReply(Player* bot, ChatChannelSource chatCha
         placeholders["%other_name"] = name;
         AreaTableEntry const* current_area = GET_PLAYERBOT_AI(bot)->GetCurrentArea();
         AreaTableEntry const* current_zone = GET_PLAYERBOT_AI(bot)->GetCurrentZone();
-        placeholders["%area_name"] = current_area ? GET_PLAYERBOT_AI(bot)->GetLocalizedAreaName(current_area) : PlayerbotTextMgr::instance().GetBotText("string_unknown_area");
-        placeholders["%zone_name"] = current_zone ? GET_PLAYERBOT_AI(bot)->GetLocalizedAreaName(current_zone) : PlayerbotTextMgr::instance().GetBotText("string_unknown_area");
+        placeholders["%area_name"] = current_area ? PlayerbotAI::GetLocalizedAreaName(current_area) : PlayerbotTextMgr::instance().GetBotText("string_unknown_area");
+        placeholders["%zone_name"] = current_zone ? PlayerbotAI::GetLocalizedAreaName(current_zone) : PlayerbotTextMgr::instance().GetBotText("string_unknown_area");
         placeholders["%my_class"] = GET_PLAYERBOT_AI(bot)->GetChatHelper()->FormatClass(bot->getClass());
         placeholders["%my_race"] = GET_PLAYERBOT_AI(bot)->GetChatHelper()->FormatRace(bot->getRace());
         placeholders["%my_level"] = std::to_string(bot->GetLevel());
@@ -441,8 +439,8 @@ bool ChatReplyAction::HandleLFGQuestsReply(Player* bot, ChatChannelSource chatCh
         placeholders["%other_name"] = name;
         AreaTableEntry const* current_area = GET_PLAYERBOT_AI(bot)->GetCurrentArea();
         AreaTableEntry const* current_zone = GET_PLAYERBOT_AI(bot)->GetCurrentZone();
-        placeholders["%area_name"] = current_area ? GET_PLAYERBOT_AI(bot)->GetLocalizedAreaName(current_area) : PlayerbotTextMgr::instance().GetBotText("string_unknown_area");
-        placeholders["%zone_name"] = current_zone ? GET_PLAYERBOT_AI(bot)->GetLocalizedAreaName(current_zone) : PlayerbotTextMgr::instance().GetBotText("string_unknown_area");
+        placeholders["%area_name"] = current_area ? PlayerbotAI::GetLocalizedAreaName(current_area) : PlayerbotTextMgr::instance().GetBotText("string_unknown_area");
+        placeholders["%zone_name"] = current_zone ? PlayerbotAI::GetLocalizedAreaName(current_zone) : PlayerbotTextMgr::instance().GetBotText("string_unknown_area");
         placeholders["%my_class"] = GET_PLAYERBOT_AI(bot)->GetChatHelper()->FormatClass(bot->getClass());
         placeholders["%my_race"] = GET_PLAYERBOT_AI(bot)->GetChatHelper()->FormatRace(bot->getRace());
         placeholders["%my_level"] = std::to_string(bot->GetLevel());

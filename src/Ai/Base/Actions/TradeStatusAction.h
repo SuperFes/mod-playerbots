@@ -21,6 +21,7 @@ public:
 
 private:
     void BeginTrade();
+    void CancelTrade();
     bool CheckTrade();
     // Whether this side has put any item in the window at all, regardless of what it is worth.
     static bool HasTradedItem(Player* player);

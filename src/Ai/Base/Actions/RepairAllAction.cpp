@@ -5,7 +5,6 @@
  */
 
 #include "RepairAllAction.h"
-
 #include "ChatHelper.h"
 #include "Event.h"
 #include "Playerbots.h"
@@ -23,7 +22,7 @@ bool RepairAllAction::Execute(Event /*event*/)
             bot->RemoveAurasByType(SPELL_AURA_FEIGN_DEATH);
 
         bot->SetFacingToObject(unit);
-        if (sPlayerbotAIConfig.randomBotEmote)
+        if (sPlayerbotAIConfig.RandomBotEmote)
             bot->HandleEmoteCommand(EMOTE_ONESHOT_USE_STANDING);
         float discountMod = bot->GetReputationPriceDiscount(unit);
 

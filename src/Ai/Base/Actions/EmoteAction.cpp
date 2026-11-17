@@ -5,7 +5,6 @@
  */
 
 #include "EmoteAction.h"
-
 #include "Event.h"
 #include "Playerbots.h"
 
@@ -92,7 +91,7 @@ void EmoteActionBase::InitEmotes()
 
 bool EmoteActionBase::Emote(Unit* target, uint32 type, bool textEmote)
 {
-    if (target && !bot->HasInArc(static_cast<float>(M_PI), target, sPlayerbotAIConfig.sightDistance))
+    if (target && !bot->HasInArc(static_cast<float>(M_PI), target, sPlayerbotAIConfig.SightDistance))
         bot->SetFacingToObject(target);
 
     ObjectGuid oldSelection = bot->GetTarget();
@@ -104,7 +103,7 @@ bool EmoteActionBase::Emote(Unit* target, uint32 type, bool textEmote)
         if (player)
         {
             PlayerbotAI* playerBotAI = GET_PLAYERBOT_AI(player);
-            if (playerBotAI && !player->HasInArc(static_cast<float>(M_PI), bot, sPlayerbotAIConfig.sightDistance))
+            if (playerBotAI && !player->HasInArc(static_cast<float>(M_PI), bot, sPlayerbotAIConfig.SightDistance))
             {
                 player->SetFacingToObject(bot);
             }
@@ -137,7 +136,7 @@ Unit* EmoteActionBase::GetTarget()
     for (GuidVector::iterator i = nfp.begin(); i != nfp.end(); ++i)
     {
         Unit* unit = botAI->GetUnit(*i);
-        if (unit && ServerFacade::instance().GetDistance2d(bot, unit) < sPlayerbotAIConfig.tooCloseDistance)
+        if (unit && ServerFacade::instance().GetDistance2d(bot, unit) < sPlayerbotAIConfig.TooCloseDistance)
             targets.push_back(unit);
     }
 
@@ -622,7 +621,7 @@ bool EmoteActionBase::ReceiveEmote(Player* source, uint32 emote, bool verbal)
             break;
     }
 
-    if (source && !bot->isMoving() && !bot->HasInArc(static_cast<float>(M_PI), source, sPlayerbotAIConfig.farDistance))
+    if (source && !bot->isMoving() && !bot->HasInArc(static_cast<float>(M_PI), source, sPlayerbotAIConfig.FarDistance))
         ServerFacade::instance().SetFacingTo(bot, source);
 
     if (verbal)
@@ -693,7 +692,7 @@ bool EmoteAction::Execute(Event event)
         p >> emoteId >> source;
 
         pSource = ObjectAccessor::FindPlayer(source);
-        if (pSource && pSource != bot && ServerFacade::instance().GetDistance2d(bot, pSource) < sPlayerbotAIConfig.farDistance &&
+        if (pSource && pSource != bot && ServerFacade::instance().GetDistance2d(bot, pSource) < sPlayerbotAIConfig.FarDistance &&
             emoteId != EMOTE_ONESHOT_NONE)
         {
             if ((pSource->GetGUID() != bot->GetGUID()) &&

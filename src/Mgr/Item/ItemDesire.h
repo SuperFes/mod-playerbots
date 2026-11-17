@@ -26,7 +26,7 @@ class ItemDesire
 {
 public:
     // Set-piece and best-in-slot weightings, and the margin required to defer, are configurable:
-    // AiPlayerbot.LootDesireSetBonus / LootDesireBisBonus / LootCourtesyMargin.
+    // Playerbots.LootDesireSetBonus / LootDesireBisBonus / LootCourtesyMargin.
     // How far below the bot's current gear score the BiS lookup may fall back when the exact tier
     // has no rows. Without this a levelling bot matches nothing and never gets the BiS bonus.
     static constexpr uint16 BIS_TIER_SEARCH_DROP = 60;

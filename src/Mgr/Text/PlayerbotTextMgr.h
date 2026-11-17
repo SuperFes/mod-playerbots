@@ -7,13 +7,12 @@
 #ifndef PLAYERBOTS_PLAYERBOTTEXTMGR_H
 #define PLAYERBOTS_PLAYERBOTTEXTMGR_H
 
+#include "Common.h"
 #include <map>
 #include <mutex>
 #include <set>
 #include <string>
 #include <vector>
-
-#include "Common.h"
 
 struct BotTextEntry
 {
@@ -83,7 +82,7 @@ public:
                                     std::map<std::string, std::string> placeholders);
     void LoadBotTexts();
     void LoadBotTextChance();
-    static void replaceAll(std::string& str, const std::string& from, const std::string& to);
+    static void replaceAll(std::string& str, std::string const& from, std::string const& to);
     bool rollTextChance(std::string text);
 
     uint32 GetLocalePriority();
@@ -109,8 +108,8 @@ private:
     };
     ~PlayerbotTextMgr() = default;
 
-    PlayerbotTextMgr(const PlayerbotTextMgr&) = delete;
-    PlayerbotTextMgr& operator=(const PlayerbotTextMgr&) = delete;
+    PlayerbotTextMgr(PlayerbotTextMgr const&) = delete;
+    PlayerbotTextMgr& operator=(PlayerbotTextMgr const&) = delete;
 
     PlayerbotTextMgr(PlayerbotTextMgr&&) = delete;
     PlayerbotTextMgr& operator=(PlayerbotTextMgr&&) = delete;

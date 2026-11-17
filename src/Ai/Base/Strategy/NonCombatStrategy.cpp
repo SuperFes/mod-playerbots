@@ -40,14 +40,14 @@ void MountStrategy::InitTriggers(std::vector<TriggerNode*>& /*triggers*/)
 
 void TradeskillStrategy::InitTriggers(std::vector<TriggerNode*>& triggers)
 {
-    if (!sPlayerbotAIConfig.tradeskillWhenIdle && !sPlayerbotAIConfig.idleSit &&
-        !sPlayerbotAIConfig.utilityCallouts && !sPlayerbotAIConfig.vendorDeclutter &&
-        !sPlayerbotAIConfig.buyReagents && !sPlayerbotAIConfig.auctionSurplus)
+    if (!sPlayerbotAIConfig.TradeskillWhenIdle && !sPlayerbotAIConfig.IdleSit &&
+        !sPlayerbotAIConfig.UtilityCallouts && !sPlayerbotAIConfig.VendorDeclutter &&
+        !sPlayerbotAIConfig.BuyReagents && !sPlayerbotAIConfig.AuctionSurplus)
         return;
 
     // Low relevance throughout: anything the bot could be doing instead should win. These only get a
     // tick because nothing else wanted one.
-    if (sPlayerbotAIConfig.tradeskillWhenIdle)
+    if (sPlayerbotAIConfig.TradeskillWhenIdle)
     {
         triggers.push_back(new TriggerNode("bot idle", { NextAction("craft random item", 1.2f) }));
         triggers.push_back(new TriggerNode("bot idle", { NextAction("use random recipe", 1.1f) }));
@@ -56,26 +56,26 @@ void TradeskillStrategy::InitTriggers(std::vector<TriggerNode*>& triggers)
     }
 
     // Announcing a battle rez the moment someone drops is the whole point of the feature.
-    if (sPlayerbotAIConfig.utilityCallouts)
+    if (sPlayerbotAIConfig.UtilityCallouts)
     {
         triggers.push_back(new TriggerNode("party member dead", { NextAction("battle rez callout", 12.0f) }));
         triggers.push_back(new TriggerNode("bot idle", { NextAction("utility callout", 2.0f) }));
     }
 
     // Listing beats vendoring, which beats sitting down.
-    if (sPlayerbotAIConfig.auctionSurplus)
+    if (sPlayerbotAIConfig.AuctionSurplus)
         triggers.push_back(new TriggerNode("bot idle", { NextAction("auction surplus", 1.7f) }));
 
     // Restocking beats selling: being unable to cast a group buff matters more than bag space.
-    if (sPlayerbotAIConfig.buyReagents)
+    if (sPlayerbotAIConfig.BuyReagents)
         triggers.push_back(new TriggerNode("bot idle", { NextAction("buy reagents", 1.6f) }));
 
     // Standing at a vendor with a bag of greys is the obvious moment to clear them out.
-    if (sPlayerbotAIConfig.vendorDeclutter)
+    if (sPlayerbotAIConfig.VendorDeclutter)
         triggers.push_back(new TriggerNode("bot idle", { NextAction("vendor declutter", 1.5f) }));
 
     // Last resort: nothing to craft, nothing to do, so sit down like a person would.
-    if (sPlayerbotAIConfig.idleSit)
+    if (sPlayerbotAIConfig.IdleSit)
         triggers.push_back(new TriggerNode("bot idle", { NextAction("idle sit", 0.5f) }));
 }
 

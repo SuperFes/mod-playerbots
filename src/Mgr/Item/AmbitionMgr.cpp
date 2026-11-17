@@ -123,7 +123,7 @@ BotAmbition AmbitionMgr::ResolveFor(Player* bot) const
 {
     BotAmbition ambition;
 
-    if (!bot || !sPlayerbotAIConfig.botAmbitions)
+    if (!bot || !sPlayerbotAIConfig.BotAmbitions)
         return ambition;
 
     PlayerbotAI* botAI = GET_PLAYERBOT_AI(bot);

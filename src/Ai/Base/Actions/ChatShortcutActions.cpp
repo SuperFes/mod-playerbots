@@ -5,7 +5,6 @@
  */
 
 #include "ChatShortcutActions.h"
-
 #include "Event.h"
 #include "Formations.h"
 #include "PlayerbotTextMgr.h"
@@ -115,7 +114,7 @@ bool FollowChatShortcutAction::Execute(Event /*event*/)
         if (bot->GetPet())
             botAI->PetFollow();
 
-        if (moved && ServerFacade::instance().IsDistanceLessOrEqualThan(bot->GetDistance(master), sPlayerbotAIConfig.farDistance))
+        if (moved && ServerFacade::instance().IsDistanceLessOrEqualThan(bot->GetDistance(master), sPlayerbotAIConfig.FarDistance))
         {
             botAI->TellMaster(PlayerbotTextMgr::instance().GetBotTextOrDefault(
                 "following", "Following", GetDefaultPlaceholders(botAI, bot, master)));
@@ -136,7 +135,7 @@ bool FollowChatShortcutAction::Execute(Event /*event*/)
         // distance test existed, but only on the in-combat path above. Switching the strategy is
         // enough on its own; "follow" then walks them in like anyone else.
         bool const crossMap = bot->GetMapId() != master->GetMapId();
-        if (crossMap || bot->GetDistance(master) > sPlayerbotAIConfig.followTeleportDistance)
+        if (crossMap || bot->GetDistance(master) > sPlayerbotAIConfig.FollowTeleportDistance)
         {
             bot->RemoveAurasWithInterruptFlags(AURA_INTERRUPT_FLAG_TELEPORTED | AURA_INTERRUPT_FLAG_CHANGE_MAP);
             bot->TeleportTo(master->GetMapId(), master->GetPositionX(), master->GetPositionY(),
@@ -200,7 +199,7 @@ bool FleeChatShortcutAction::Execute(Event /*event*/)
     ResetReturnPosition();
     ResetStayPosition();
 
-    if (bot->GetMapId() != master->GetMapId() || bot->GetDistance(master) > sPlayerbotAIConfig.sightDistance)
+    if (bot->GetMapId() != master->GetMapId() || bot->GetDistance(master) > sPlayerbotAIConfig.SightDistance)
     {
         botAI->TellError(PlayerbotTextMgr::instance().GetBotTextOrDefault(
             "fleeing_far", "I will not flee with you - too far away", GetDefaultPlaceholders(botAI, bot, master)));
@@ -253,7 +252,7 @@ bool TankAttackChatShortcutAction::Execute(Event /*event*/)
     if (!master)
         return false;
 
-    if (!botAI->IsTank(bot))
+    if (!PlayerbotAI::IsTank(bot))
         return false;
 
     botAI->Reset();

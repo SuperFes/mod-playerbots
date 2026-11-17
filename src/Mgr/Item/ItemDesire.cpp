@@ -99,11 +99,11 @@ float ItemDesire::Calculate(Player* bot, ItemTemplate const* proto, int32 random
         return 0.0f;
 
     // Wearing pieces of the same set makes another piece worth more than its stats alone say.
-    desire += newScore * sPlayerbotAIConfig.lootDesireSetBonus *
+    desire += newScore * sPlayerbotAIConfig.LootDesireSetBonus *
               static_cast<float>(CountEquippedSetPieces(bot, proto->ItemSet));
 
     if (IsBestInSlot(bot, proto, slot))
-        desire += newScore * sPlayerbotAIConfig.lootDesireBisBonus;
+        desire += newScore * sPlayerbotAIConfig.LootDesireBisBonus;
 
     // The thing this bot has actually been chasing. Weighted above best-in-slot on purpose: a bot
     // that has talked about wanting this should visibly want it more than one that merely benefits.
@@ -111,7 +111,7 @@ float ItemDesire::Calculate(Player* bot, ItemTemplate const* proto, int32 random
     if ((ambition.IsItem() && ambition.itemId == proto->ItemId) ||
         (ambition.IsSet() && proto->ItemSet && proto->ItemSet == ambition.setId))
     {
-        desire += newScore * sPlayerbotAIConfig.lootDesireAmbitionBonus;
+        desire += newScore * sPlayerbotAIConfig.LootDesireAmbitionBonus;
     }
 
     return desire;

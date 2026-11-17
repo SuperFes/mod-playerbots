@@ -5,15 +5,14 @@
  */
 
 #include "CheckMailAction.h"
-
 #include "Event.h"
 #include "GuildTaskMgr.h"
-#include "PlayerbotAIConfig.h"
 #include "PlayerbotAI.h"
+#include "PlayerbotAIConfig.h"
 
 bool CheckMailAction::Execute(Event /*event*/)
 {
-    if (sPlayerbotAIConfig.randomBotEmote && botAI->RollSocial(1))
+    if (sPlayerbotAIConfig.RandomBotEmote && botAI->RollSocial(1))
         bot->HandleEmoteCommand(EMOTE_ONESHOT_USE_STANDING);
 
     WorldPacket p;
@@ -33,7 +32,7 @@ bool CheckMailAction::Execute(Event /*event*/)
             continue;
 
         uint32 account = owner->GetSession()->GetAccountId();
-        if (PlayerbotAIConfig::instance().IsInRandomAccountList(account))
+        if (PlayerbotAIConfig::Instance().IsInRandomAccountList(account))
             continue;
 
         ProcessMail(mail, owner, trans);

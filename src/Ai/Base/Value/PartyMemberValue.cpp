@@ -6,11 +6,10 @@
 
 #include "PartyMemberValue.h"
 #include "Corpse.h"
-
 #include "Group.h"
+#include "Pet.h"
 #include "PlayerbotAI.h"
 #include "ServerFacade.h"
-#include "Pet.h"
 #include "Spell.h"
 
 Unit* PartyMemberValue::FindPartyMember(std::vector<Player*>* party, FindPlayerPredicate& predicate)
@@ -78,9 +77,9 @@ Unit* PartyMemberValue::FindPartyMember(FindPlayerPredicate& predicate, bool /*i
         if (!player)
             continue;
 
-        if (botAI->IsHeal(player))
+        if (PlayerbotAI::IsHeal(player))
             healers.push_back(player);
-        else if (botAI->IsTank(player))
+        else if (PlayerbotAI::IsTank(player))
             tanks.push_back(player);
         else if (player != master)
             others.push_back(player);
@@ -107,7 +106,7 @@ Unit* PartyMemberValue::FindPartyMember(FindPlayerPredicate& predicate, bool /*i
 bool PartyMemberValue::Check(Unit* player)
 {
     bool isGM = player->ToPlayer() && player->ToPlayer()->IsGameMaster();
-    float maxDist = bot->IsInCombat() ? sPlayerbotAIConfig.spellDistance * 2 : sPlayerbotAIConfig.spellDistance;
+    float maxDist = bot->IsInCombat() ? sPlayerbotAIConfig.SpellDistance * 2 : sPlayerbotAIConfig.SpellDistance;
     return player && player->GetMapId() == bot->GetMapId() && !isGM &&
            bot->GetDistance(player) <= maxDist &&
            bot->IsWithinLOS(player->GetPositionX(), player->GetPositionY(), player->GetPositionZ());
@@ -154,8 +153,6 @@ bool PartyMemberValue::IsTargetOfSpellCast(Player* target, SpellEntryPredicate& 
 class FindMainTankPlayer : public FindPlayerPredicate
 {
 public:
-    FindMainTankPlayer(PlayerbotAI* botAI) : botAI(botAI) {}
-
     virtual bool Check(Unit* unit)
     {
         Player* player = unit->ToPlayer();
@@ -163,15 +160,12 @@ public:
         {
             return false;
         }
-        return botAI->IsMainTank(player);
+        return PlayerbotAI::IsMainTank(player);
     }
-
-private:
-    PlayerbotAI* botAI;
 };
 
 Unit* PartyMemberMainTankValue::Calculate()
 {
-    FindMainTankPlayer findMainTankPlayer(botAI);
+    FindMainTankPlayer findMainTankPlayer;
     return FindPartyMember(findMainTankPlayer);
 }

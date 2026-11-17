@@ -5,12 +5,11 @@
  */
 
 #include "EmoteStrategy.h"
-
 #include "Playerbots.h"
 
 void EmoteStrategy::InitTriggers(std::vector<TriggerNode*>& triggers)
 {
-    if (sPlayerbotAIConfig.randomBotEmote)
+    if (sPlayerbotAIConfig.RandomBotEmote)
     {
         triggers.push_back(new TriggerNode("sometimes", { NextAction("talk", 1.0f) }));
         triggers.push_back(new TriggerNode("sometimes", { NextAction("ambient say", 0.9f) }));
@@ -21,7 +20,7 @@ void EmoteStrategy::InitTriggers(std::vector<TriggerNode*>& triggers)
             new TriggerNode("receive emote", { NextAction("emote", 10.0f) }));
     }
 
-    if (sPlayerbotAIConfig.randomBotTalk)
+    if (sPlayerbotAIConfig.RandomBotTalk)
     {
         triggers.push_back(new TriggerNode(
             "sometimes",
@@ -29,7 +28,7 @@ void EmoteStrategy::InitTriggers(std::vector<TriggerNode*>& triggers)
                               NextAction("suggest dungeon", 3.0f), NextAction("suggest trade", 3.0f) }));
     }
 
-    if (sPlayerbotAIConfig.enableGreet)
+    if (sPlayerbotAIConfig.EnableGreet)
         triggers.push_back(
             new TriggerNode("new player nearby", { NextAction("greet", 1.0f) }));
 
